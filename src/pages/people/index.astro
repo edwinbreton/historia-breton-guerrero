@@ -55,7 +55,7 @@ const both     = sorted.filter(p => p.data.branch === 'both');
             </h2>
             <div class="people-grid">
               {breton.map(person => (
-                <a href={`/people/${person.data.slug}`} class="person-card person-card--breton">
+                <a href={`/people/${person.id}`} class="person-card person-card--breton">
                   <div class="person-card__band band-breton" aria-hidden="true"></div>
                   <div class="person-card__body">
                     <div class="person-card__portrait">
@@ -90,7 +90,7 @@ const both     = sorted.filter(p => p.data.branch === 'both');
             </h2>
             <div class="people-grid">
               {guerrero.map(person => (
-                <a href={`/people/${person.data.slug}`} class="person-card person-card--guerrero">
+                <a href={`/people/${person.id}`} class="person-card person-card--guerrero">
                   <div class="person-card__band band-guerrero" aria-hidden="true"></div>
                   <div class="person-card__body">
                     <div class="person-card__portrait">
@@ -126,7 +126,7 @@ const both     = sorted.filter(p => p.data.branch === 'both');
               </h2>
               <div class="people-grid">
                 {both.map(person => (
-                  <a href={`/people/${person.data.slug}`} class="person-card person-card--both">
+                  <a href={`/people/${person.id}`} class="person-card person-card--both">
                     <div class="person-card__band band-both" aria-hidden="true"></div>
                     <div class="person-card__body">
                       <div class="person-card__portrait">

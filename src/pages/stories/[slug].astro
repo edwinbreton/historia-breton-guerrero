@@ -5,7 +5,7 @@ import { getCollection } from 'astro:content';
 export async function getStaticPaths() {
   const stories = await getCollection('stories');
   return stories.map(story => ({
-    params: { slug: story.data.slug },
+    params: { slug: story.id },
     props:  { story },
   }));
 }
@@ -16,7 +16,7 @@ const data = story.data;
 
 // Resolve related people
 const allPeople = await getCollection('people');
-const bySlug = Object.fromEntries(allPeople.map(p => [p.data.slug, p.data]));
+const bySlug = Object.fromEntries(allPeople.map(p => [p.id, { ...p.data, slug: p.id }]));
 const relatedPeople = (data.relatedPeople ?? []).map(s => bySlug[s]).filter(Boolean);
 
 const branchLabel: Record<string, string> = {

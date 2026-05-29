@@ -41,7 +41,7 @@ const branchLabel: Record<string, string> = {
         <div class="stories-list">
           {sorted.map(story => (
             <a
-              href={`/stories/${story.data.slug}`}
+              href={`/stories/${story.id}`}
               class="story-card"
               data-branch={story.data.branch}
             >

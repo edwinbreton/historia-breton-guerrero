@@ -5,7 +5,6 @@ const people = defineCollection({
   loader: glob({ pattern: '**/*.mdx', base: './src/content/people' }),
   schema: z.object({
     name:       z.string(),
-    slug:       z.string(),
     branch:     z.enum(['breton', 'guerrero', 'both']),
     generation: z.number(),
     born:       z.string().optional(),
@@ -27,7 +26,6 @@ const stories = defineCollection({
   loader: glob({ pattern: '**/*.mdx', base: './src/content/stories' }),
   schema: z.object({
     title:         z.string(),
-    slug:          z.string(),
     branch:        z.enum(['breton', 'guerrero', 'both']),
     date:          z.string(),
     author:        z.string().optional(),

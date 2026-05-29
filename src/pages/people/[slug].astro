@@ -5,7 +5,7 @@ import { getCollection } from 'astro:content';
 export async function getStaticPaths() {
   const people = await getCollection('people');
   return people.map(person => ({
-    params: { slug: person.data.slug },
+    params: { slug: person.id },
     props:  { person },
   }));
 }
@@ -13,10 +13,11 @@ export async function getStaticPaths() {
 const { person } = Astro.props;
 const { Content } = await person.render();
 const data = person.data;
+const slug = person.id;
 
 // Resolve family relationship names from slugs
 const allPeople = await getCollection('people');
-const bySlug = Object.fromEntries(allPeople.map(p => [p.data.slug, p.data]));
+const bySlug = Object.fromEntries(allPeople.map(p => [p.id, { ...p.data, slug: p.id }]));
 
 const parents  = (data.parents  ?? []).map(s => bySlug[s]).filter(Boolean);
 const children = (data.children ?? []).map(s => bySlug[s]).filter(Boolean);
@@ -24,7 +25,7 @@ const spouses  = (data.spouses  ?? []).map(s => bySlug[s]).filter(Boolean);
 
 // Related stories
 const allStories = await getCollection('stories');
-const relatedStories = allStories.filter(s => s.data.relatedPeople?.includes(data.slug));
+const relatedStories = allStories.filter(s => s.data.relatedPeople?.includes(slug));
 
 const isBranch = (b: string) => data.branch === b;
 const branchLabel = data.branch === 'breton' ? 'Familia Bretón' : data.branch === 'guerrero' ? 'Familia Guerrero' : 'Ambas familias';
@@ -130,7 +131,7 @@ const generationLabel = generationLabels[data.generation] ?? `Generación ${data
         <ul class="story-list">
           {relatedStories.map(story => (
             <li>
-              <a href={`/stories/${story.data.slug}`} class="story-item">
+              <a href={`/stories/${story.id}`} class="story-item">
                 <div class:list={['story-item__band', `band-${story.data.branch}`]} aria-hidden="true"></div>
                 <div class="story-item__body">
                   <span class="story-item__title">{story.data.title}</span>

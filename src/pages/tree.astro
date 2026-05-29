@@ -6,7 +6,7 @@ const allPeople = await getCollection('people');
 
 // Serialize only what D3 needs
 const nodes = allPeople.map(p => ({
-  slug:       p.data.slug,
+  slug:       p.id,
   name:       p.data.name,
   branch:     p.data.branch,
   generation: p.data.generation,

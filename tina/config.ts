@@ -38,6 +38,16 @@ export default defineConfig({
             delete: true,
             createNestedFolder: false,
           },
+          filename: {
+            readonly: true,
+            slugify: (values: Record<string, any>) =>
+              (values.name ?? 'sin-nombre')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[̀-ͯ]/g, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, ''),
+          },
         },
         fields: [
           {
@@ -45,12 +55,6 @@ export default defineConfig({
             name: "name",
             label: "Nombre completo",
             isTitle: true,
-            required: true,
-          },
-          {
-            type: "string",
-            name: "slug",
-            label: "Slug (URL)",
             required: true,
           },
           {
@@ -160,6 +164,16 @@ export default defineConfig({
             delete: true,
             createNestedFolder: false,
           },
+          filename: {
+            readonly: true,
+            slugify: (values: Record<string, any>) =>
+              (values.title ?? 'sin-titulo')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[̀-ͯ]/g, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/(^-|-$)/g, ''),
+          },
         },
         fields: [
           {
@@ -167,12 +181,6 @@ export default defineConfig({
             name: "title",
             label: "Título",
             isTitle: true,
-            required: true,
-          },
-          {
-            type: "string",
-            name: "slug",
-            label: "Slug (URL)",
             required: true,
           },
           {
