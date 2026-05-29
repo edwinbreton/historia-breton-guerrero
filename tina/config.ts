@@ -29,8 +29,16 @@ export default defineConfig({
       {
         name: "person",
         label: "Personas",
+        description: "Haz clic en 'Add a file' para agregar una nueva persona a la familia.",
         path: "src/content/people",
         format: "mdx",
+        ui: {
+          allowedActions: {
+            create: true,
+            delete: true,
+            createNestedFolder: false,
+          },
+        },
         fields: [
           {
             type: "string",
@@ -143,8 +151,16 @@ export default defineConfig({
       {
         name: "story",
         label: "Historias",
+        description: "Haz clic en 'Add a file' para agregar una nueva historia.",
         path: "src/content/stories",
         format: "mdx",
+        ui: {
+          allowedActions: {
+            create: true,
+            delete: true,
+            createNestedFolder: false,
+          },
+        },
         fields: [
           {
             type: "string",
