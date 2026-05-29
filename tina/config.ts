@@ -1,6 +1,5 @@
 import { defineConfig } from "tinacms";
 
-// Your hosting provider likely exposes this as an environment variable
 const branch =
   process.env.GITHUB_BRANCH ||
   process.env.VERCEL_GIT_COMMIT_REF ||
@@ -9,47 +8,185 @@ const branch =
 
 export default defineConfig({
   branch,
-
-  // Get this from tina.io
-  clientId: process.env.NEXT_PUBLIC_TINA_CLIENT_ID,
-  // Get this from tina.io
+  clientId: process.env.TINA_CLIENT_ID,
   token: process.env.TINA_TOKEN,
 
   build: {
     outputFolder: "admin",
     publicFolder: "public",
   },
-  // Uncomment to allow cross-origin requests from non-localhost origins
-  // during local development (e.g. GitHub Codespaces, Gitpod, Docker).
-  // Use 'private' to allow all private-network IPs (WSL2, Docker, etc.)
-  // server: {
-  //   allowedOrigins: ['https://your-codespace.github.dev'],
-  // },
+
   media: {
     tina: {
-      mediaRoot: "",
+      mediaRoot: "uploads",
       publicFolder: "public",
     },
   },
-  // See docs on content modeling for more info on how to setup new content models: https://tina.io/docs/r/content-modelling-collections/
+
   schema: {
     collections: [
+      // ── Person ────────────────────────────────────────────────────────
       {
-        name: "post",
-        label: "Posts",
-        path: "content/posts",
+        name: "person",
+        label: "Personas",
+        path: "src/content/people",
+        format: "mdx",
         fields: [
           {
             type: "string",
-            name: "title",
-            label: "Title",
+            name: "name",
+            label: "Nombre completo",
             isTitle: true,
             required: true,
           },
           {
+            type: "string",
+            name: "slug",
+            label: "Slug (URL)",
+            required: true,
+          },
+          {
+            type: "string",
+            name: "branch",
+            label: "Familia",
+            required: true,
+            options: [
+              { value: "breton",   label: "Bretón" },
+              { value: "guerrero", label: "Guerrero" },
+            ],
+          },
+          {
+            type: "number",
+            name: "generation",
+            label: "Generación (1 = más antigua)",
+            required: true,
+          },
+          {
+            type: "datetime",
+            name: "born",
+            label: "Fecha de nacimiento",
+            dateFormat: "YYYY-MM-DD",
+            ui: { dateFormat: "DD MMM YYYY" },
+          },
+          {
+            type: "datetime",
+            name: "died",
+            label: "Fecha de fallecimiento",
+            dateFormat: "YYYY-MM-DD",
+            ui: { dateFormat: "DD MMM YYYY" },
+          },
+          {
+            type: "string",
+            name: "birthplace",
+            label: "Lugar de nacimiento",
+          },
+          {
+            type: "string",
+            name: "occupation",
+            label: "Ocupación",
+          },
+          {
+            type: "image",
+            name: "portrait",
+            label: "Foto principal",
+          },
+          {
+            type: "object",
+            name: "photos",
+            label: "Galería de fotos",
+            list: true,
+            fields: [
+              { type: "image",  name: "src",     label: "Foto" },
+              { type: "string", name: "caption", label: "Descripción" },
+            ],
+          },
+          {
             type: "rich-text",
             name: "body",
-            label: "Body",
+            label: "Biografía",
+            isBody: true,
+          },
+          // Relationships stored as slug strings; resolved at query time
+          {
+            type: "string",
+            name: "parents",
+            label: "Padres (slugs)",
+            list: true,
+          },
+          {
+            type: "string",
+            name: "children",
+            label: "Hijos (slugs)",
+            list: true,
+          },
+          {
+            type: "string",
+            name: "spouses",
+            label: "Cónyuge(s) (slugs)",
+            list: true,
+          },
+        ],
+      },
+
+      // ── Story ─────────────────────────────────────────────────────────
+      {
+        name: "story",
+        label: "Historias",
+        path: "src/content/stories",
+        format: "mdx",
+        fields: [
+          {
+            type: "string",
+            name: "title",
+            label: "Título",
+            isTitle: true,
+            required: true,
+          },
+          {
+            type: "string",
+            name: "slug",
+            label: "Slug (URL)",
+            required: true,
+          },
+          {
+            type: "string",
+            name: "branch",
+            label: "Familia",
+            required: true,
+            options: [
+              { value: "breton",   label: "Bretón" },
+              { value: "guerrero", label: "Guerrero" },
+              { value: "both",     label: "Ambas familias" },
+            ],
+          },
+          {
+            type: "datetime",
+            name: "date",
+            label: "Fecha",
+            dateFormat: "YYYY-MM-DD",
+            ui: { dateFormat: "DD MMM YYYY" },
+            required: true,
+          },
+          {
+            type: "string",
+            name: "author",
+            label: "Autor",
+          },
+          {
+            type: "image",
+            name: "featuredImage",
+            label: "Imagen destacada",
+          },
+          {
+            type: "string",
+            name: "relatedPeople",
+            label: "Personas relacionadas (slugs)",
+            list: true,
+          },
+          {
+            type: "rich-text",
+            name: "body",
+            label: "Contenido",
             isBody: true,
           },
         ],

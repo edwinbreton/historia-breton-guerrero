@@ -1,0 +1,488 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const people = await getCollection('people');
+  return people.map(person => ({
+    params: { slug: person.data.slug },
+    props:  { person },
+  }));
+}
+
+const { person } = Astro.props;
+const { Content } = await person.render();
+const data = person.data;
+
+// Resolve family relationship names from slugs
+const allPeople = await getCollection('people');
+const bySlug = Object.fromEntries(allPeople.map(p => [p.data.slug, p.data]));
+
+const parents  = (data.parents  ?? []).map(s => bySlug[s]).filter(Boolean);
+const children = (data.children ?? []).map(s => bySlug[s]).filter(Boolean);
+const spouses  = (data.spouses  ?? []).map(s => bySlug[s]).filter(Boolean);
+
+// Related stories
+const allStories = await getCollection('stories');
+const relatedStories = allStories.filter(s => s.data.relatedPeople?.includes(data.slug));
+
+const isBranch = (b: string) => data.branch === b;
+const branchLabel = data.branch === 'breton' ? 'Familia Bretón' : 'Familia Guerrero';
+
+function formatDate(str?: string) {
+  if (!str) return null;
+  const d = new Date(str);
+  return d.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+}
+
+const generationLabels: Record<number, string> = {
+  1: 'Bisabuelos',
+  2: 'Abuelos',
+  3: 'Padres',
+  4: 'Hijos',
+  5: 'Nietos',
+};
+const generationLabel = generationLabels[data.generation] ?? `Generación ${data.generation}`;
+---
+
+<Layout title={data.name} description={`Perfil de ${data.name} — ${branchLabel}`}>
+  <!-- Top band -->
+  <div class:list={['profile-band', `profile-band--${data.branch}`]} aria-hidden="true"></div>
+
+  <div class="container profile">
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/people">Personas</a>
+      <span aria-hidden="true">›</span>
+      <a href={`/people?branch=${data.branch}`}>{branchLabel}</a>
+      <span aria-hidden="true">›</span>
+      <span aria-current="page">{data.name}</span>
+    </nav>
+
+    <!-- Hero -->
+    <div class="profile-hero">
+      <div class="profile-hero__portrait">
+        {data.portrait
+          ? <img src={data.portrait} alt={data.name} />
+          : <div class:list={['profile-hero__placeholder', `profile-hero__placeholder--${data.branch}`]}></div>
+        }
+      </div>
+      <div class="profile-hero__info">
+        <div class:list={['family-tag', `family-tag--${data.branch}`]}>{branchLabel}</div>
+        <h1 class="profile-hero__name">{data.name}</h1>
+        <p class="profile-hero__meta">
+          {data.born && <span>{formatDate(data.born)}</span>}
+          {data.born && data.died && <span aria-hidden="true"> – </span>}
+          {data.died && <span>{formatDate(data.died)}</span>}
+        </p>
+        {data.birthplace && <p class="profile-hero__place">📍 {data.birthplace}</p>}
+        <span class="profile-hero__generation">{generationLabel}</span>
+      </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="about"   role="tab" aria-selected="true"  aria-controls="panel-about">Acerca de</button>
+      <button class="tab"        data-tab="photos"  role="tab" aria-selected="false" aria-controls="panel-photos">Fotos</button>
+      <button class="tab"        data-tab="stories" role="tab" aria-selected="false" aria-controls="panel-stories">Historias</button>
+      <button class="tab"        data-tab="family"  role="tab" aria-selected="false" aria-controls="panel-family">Familia</button>
+    </div>
+
+    <!-- About panel -->
+    <div id="panel-about" class="tab-panel" role="tabpanel">
+      <!-- Biography -->
+      {person.body.trim() ? (
+        <div class="bio prose">
+          <Content />
+        </div>
+      ) : (
+        <p class="empty-tab">Biografía próximamente.</p>
+      )}
+
+      <!-- Details grid -->
+      <div class="details-grid">
+        {data.born       && <div class="detail"><span class="detail__label">Nacimiento</span><span>{formatDate(data.born)}</span></div>}
+        {data.birthplace && <div class="detail"><span class="detail__label">Lugar</span><span>{data.birthplace}</span></div>}
+        {data.occupation && <div class="detail"><span class="detail__label">Ocupación</span><span>{data.occupation}</span></div>}
+        {data.died       && <div class="detail"><span class="detail__label">Fallecimiento</span><span>{formatDate(data.died)}</span></div>}
+      </div>
+    </div>
+
+    <!-- Photos panel -->
+    <div id="panel-photos" class="tab-panel hidden" role="tabpanel">
+      {data.photos && data.photos.length > 0 ? (
+        <div class="photo-grid">
+          {data.photos.map(photo => (
+            <figure class="photo-figure">
+              <img src={photo.src} alt={photo.caption ?? data.name} />
+              {photo.caption && <figcaption>{photo.caption}</figcaption>}
+            </figure>
+          ))}
+        </div>
+      ) : (
+        <p class="empty-tab">No hay fotos registradas.</p>
+      )}
+    </div>
+
+    <!-- Stories panel -->
+    <div id="panel-stories" class="tab-panel hidden" role="tabpanel">
+      {relatedStories.length > 0 ? (
+        <ul class="story-list">
+          {relatedStories.map(story => (
+            <li>
+              <a href={`/stories/${story.data.slug}`} class="story-item">
+                <div class:list={['story-item__band', `band-${story.data.branch}`]} aria-hidden="true"></div>
+                <div class="story-item__body">
+                  <span class="story-item__title">{story.data.title}</span>
+                  <span class="story-item__date">{story.data.date.slice(0,4)}</span>
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="empty-tab">No aparece en ninguna historia todavía.</p>
+      )}
+    </div>
+
+    <!-- Family panel -->
+    <div id="panel-family" class="tab-panel hidden" role="tabpanel">
+      {spouses.length > 0 && (
+        <div class="family-group">
+          <h3 class="family-group__label">Cónyuge</h3>
+          <div class="chips-row">
+            {spouses.map(p => (
+              <a href={`/people/${p.slug}`} class:list={['chip', `chip-${p.branch}`]}>{p.name}</a>
+            ))}
+          </div>
+        </div>
+      )}
+      {parents.length > 0 && (
+        <div class="family-group">
+          <h3 class="family-group__label">Padres</h3>
+          <div class="chips-row">
+            {parents.map(p => (
+              <a href={`/people/${p.slug}`} class:list={['chip', `chip-${p.branch}`]}>{p.name}</a>
+            ))}
+          </div>
+        </div>
+      )}
+      {children.length > 0 && (
+        <div class="family-group">
+          <h3 class="family-group__label">Hijos</h3>
+          <div class="chips-row">
+            {children.map(p => (
+              <a href={`/people/${p.slug}`} class:list={['chip', `chip-${p.branch}`]}>{p.name}</a>
+            ))}
+          </div>
+        </div>
+      )}
+      {spouses.length === 0 && parents.length === 0 && children.length === 0 && (
+        <p class="empty-tab">No hay conexiones familiares registradas.</p>
+      )}
+    </div>
+  </div>
+</Layout>
+
+<script>
+  const tabs    = document.querySelectorAll<HTMLButtonElement>('[data-tab]');
+  const panels  = document.querySelectorAll<HTMLElement>('.tab-panel');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab!;
+
+      tabs.forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+
+      panels.forEach(p => {
+        const show = p.id === `panel-${target}`;
+        p.classList.toggle('hidden', !show);
+      });
+    });
+  });
+</script>
+
+<style>
+  /* Band */
+  .profile-band {
+    height: 8px;
+  }
+  .profile-band--breton   { background: var(--breton); }
+  .profile-band--guerrero { background: var(--guerrero); }
+
+  .profile {
+    padding-block: var(--space-6) var(--space-16);
+  }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-8);
+    flex-wrap: wrap;
+  }
+
+  .breadcrumb a {
+    color: var(--text-secondary);
+    text-decoration: none;
+  }
+
+  .breadcrumb a:hover { color: var(--text-primary); }
+
+  /* Hero */
+  .profile-hero {
+    display: flex;
+    gap: var(--space-8);
+    align-items: flex-start;
+    margin-bottom: var(--space-10);
+  }
+
+  .profile-hero__portrait {
+    flex-shrink: 0;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+
+  .profile-hero__portrait img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .profile-hero__placeholder {
+    width: 100%;
+    height: 100%;
+  }
+
+  .profile-hero__placeholder--breton {
+    background: var(--breton-light);
+    border: 3px solid var(--breton-border);
+    border-radius: 50%;
+  }
+
+  .profile-hero__placeholder--guerrero {
+    background: var(--guerrero-light);
+    border: 3px solid var(--guerrero-border);
+    border-radius: 50%;
+  }
+
+  .family-tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 10px;
+    border-radius: 999px;
+    margin-bottom: var(--space-3);
+  }
+
+  .family-tag--breton   { background: var(--breton-light);   color: var(--breton); }
+  .family-tag--guerrero { background: var(--guerrero-light); color: var(--guerrero); }
+
+  .profile-hero__name {
+    margin-bottom: var(--space-2);
+  }
+
+  .profile-hero__meta {
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    margin-bottom: var(--space-2);
+  }
+
+  .profile-hero__place {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-bottom: var(--space-3);
+  }
+
+  .profile-hero__generation {
+    display: inline-block;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2px 8px;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: var(--space-8);
+    gap: 0;
+  }
+
+  .tab {
+    padding: var(--space-3) var(--space-6);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .tab:hover { color: var(--text-primary); }
+
+  .tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--breton);
+  }
+
+  /* Tab panels */
+  .tab-panel { }
+  .tab-panel.hidden { display: none; }
+
+  /* Bio */
+  .bio.prose {
+    max-width: 68ch;
+    margin-bottom: var(--space-8);
+  }
+
+  .bio.prose :global(p) { margin-bottom: var(--space-4); }
+  .bio.prose :global(h2),
+  .bio.prose :global(h3) { margin-top: var(--space-8); margin-bottom: var(--space-3); }
+
+  /* Details grid */
+  .details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-8);
+    padding-top: var(--space-8);
+    border-top: 1px solid var(--border);
+  }
+
+  .detail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .detail__label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  /* Photo grid */
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .photo-figure {
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--breton-light);
+  }
+
+  .photo-figure img {
+    width: 100%;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+  }
+
+  .photo-figure figcaption {
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  /* Story list */
+  .story-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .story-item {
+    display: flex;
+    align-items: stretch;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: box-shadow 0.15s;
+  }
+
+  .story-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+
+  .story-item__band {
+    width: 5px;
+    flex-shrink: 0;
+  }
+
+  .story-item__body {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-4);
+    gap: var(--space-4);
+    width: 100%;
+  }
+
+  .story-item__title { font-weight: 500; }
+
+  .story-item__date {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  /* Family chips */
+  .family-group {
+    margin-bottom: var(--space-8);
+  }
+
+  .family-group__label {
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-3);
+    font-family: var(--font-sans);
+    font-weight: 600;
+  }
+
+  .chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* Empty state */
+  .empty-tab {
+    color: var(--text-muted);
+    font-style: italic;
+    padding-block: var(--space-8);
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .profile-hero {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .tab { padding-inline: var(--space-4); }
+  }
+</style>

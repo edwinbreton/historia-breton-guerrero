@@ -1,0 +1,566 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+const allPeople = await getCollection('people');
+
+// Serialize only what D3 needs
+const nodes = allPeople.map(p => ({
+  slug:       p.data.slug,
+  name:       p.data.name,
+  branch:     p.data.branch,
+  generation: p.data.generation,
+  born:       p.data.born  ?? null,
+  died:       p.data.died  ?? null,
+  birthplace: p.data.birthplace ?? null,
+  occupation: p.data.occupation ?? null,
+  portrait:   p.data.portrait ?? null,
+  parents:    p.data.parents  ?? [],
+  children:   p.data.children ?? [],
+  spouses:    p.data.spouses  ?? [],
+}));
+---
+
+<Layout title="Árbol familiar">
+  <div class="tree-page">
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <span class="toolbar__title">Árbol familiar</span>
+      <div class="toolbar__controls">
+        <button id="btn-zoom-in"  class="toolbar__btn" aria-label="Acercar">＋</button>
+        <button id="btn-zoom-out" class="toolbar__btn" aria-label="Alejar">－</button>
+        <button id="btn-reset"    class="toolbar__btn" aria-label="Restablecer vista">⌂</button>
+      </div>
+      <div class="toolbar__legend">
+        <span class="legend-dot legend-dot--breton"></span> Bretón
+        <span class="legend-dot legend-dot--guerrero"></span> Guerrero
+      </div>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-wrap" id="canvas-wrap">
+      <svg id="tree-svg" aria-label="Árbol genealógico interactivo"></svg>
+      <div class="canvas-empty" id="canvas-empty">
+        <p>No hay personas registradas todavía.</p>
+        <p class="canvas-empty__sub">Una vez que se agreguen personas, aparecerán aquí.</p>
+      </div>
+    </div>
+
+    <!-- Info panel -->
+    <div class="info-panel" id="info-panel" aria-live="polite" hidden>
+      <button class="info-panel__close" id="info-close" aria-label="Cerrar">✕</button>
+      <div class="info-panel__portrait-wrap">
+        <div class="info-panel__portrait" id="info-portrait"></div>
+      </div>
+      <div class="info-panel__body">
+        <p class="info-panel__branch" id="info-branch"></p>
+        <h2 class="info-panel__name" id="info-name"></h2>
+        <p class="info-panel__dates" id="info-dates"></p>
+        <p class="info-panel__place" id="info-place"></p>
+        <a class="info-panel__link" id="info-link" href="#">Ver perfil →</a>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script define:vars={{ nodes }}>
+import * as d3 from 'd3';
+
+// ── Constants ────────────────────────────────────────────────────────────────
+const NODE_W = 160;
+const NODE_H = 72;
+const GEN_GAP = 160;   // vertical gap between generations
+const SIB_GAP = 24;    // horizontal gap between siblings
+
+const COLORS = {
+  breton:          '#7A6E5A',
+  'breton-light':  '#F5F1EB',
+  'breton-border': '#E8E3D8',
+  guerrero:          '#5A7270',
+  'guerrero-light':  '#E8F0EF',
+  'guerrero-border': '#D0E0DE',
+  text:    '#2A2A24',
+  muted:   '#B0ADA4',
+  surface: '#FFFFFF',
+  border:  '#E8E6E1',
+};
+
+const GEN_LABELS = { 1: 'Bisabuelos', 2: 'Abuelos', 3: 'Padres', 4: 'Hijos', 5: 'Nietos' };
+
+// ── Setup ────────────────────────────────────────────────────────────────────
+const wrap    = document.getElementById('canvas-wrap');
+const svg     = d3.select('#tree-svg');
+const empty   = document.getElementById('canvas-empty');
+const panel   = document.getElementById('info-panel');
+const btnZoomIn  = document.getElementById('btn-zoom-in');
+const btnZoomOut = document.getElementById('btn-zoom-out');
+const btnReset   = document.getElementById('btn-reset');
+
+if (!nodes.length) {
+  empty.style.display = 'flex';
+  svg.style('display', 'none');
+} else {
+  empty.style.display = 'none';
+  buildTree();
+}
+
+function buildTree() {
+  const bySlug = Object.fromEntries(nodes.map(n => [n.slug, n]));
+
+  // ── Layout: assign x by position within generation, y by generation ──────
+  const generations = [...new Set(nodes.map(n => n.generation))].sort((a, b) => a - b);
+  const genMap = new Map(); // gen → [nodes]
+  generations.forEach(g => genMap.set(g, nodes.filter(n => n.generation === g)));
+
+  const positions = new Map();
+  genMap.forEach((members, gen) => {
+    const totalW = members.length * NODE_W + (members.length - 1) * SIB_GAP;
+    members.forEach((node, i) => {
+      positions.set(node.slug, {
+        x: -totalW / 2 + i * (NODE_W + SIB_GAP) + NODE_W / 2,
+        y: (gen - 1) * GEN_GAP,
+      });
+    });
+  });
+
+  // ── SVG dimensions ───────────────────────────────────────────────────────
+  const wrapW = wrap.clientWidth;
+  const wrapH = wrap.clientHeight;
+
+  svg.attr('width', wrapW).attr('height', wrapH);
+
+  const zoom = d3.zoom()
+    .scaleExtent([0.3, 2])
+    .on('zoom', e => g.attr('transform', e.transform));
+
+  svg.call(zoom);
+
+  const g = svg.append('g');
+
+  // Center initial view
+  const allX = [...positions.values()].map(p => p.x);
+  const allY = [...positions.values()].map(p => p.y);
+  const minX = Math.min(...allX) - NODE_W / 2 - 40;
+  const maxX = Math.max(...allX) + NODE_W / 2 + 40;
+  const minY = Math.min(...allY) - 40;
+  const maxY = Math.max(...allY) + NODE_H + 60;
+  const contentW = maxX - minX;
+  const contentH = maxY - minY;
+  const scale = Math.min(wrapW / contentW, wrapH / contentH, 1);
+  const tx = wrapW / 2 - (minX + contentW / 2) * scale;
+  const ty = 60;
+  const initialTransform = d3.zoomIdentity.translate(tx, ty).scale(scale);
+  svg.call(zoom.transform, initialTransform);
+
+  // ── Generation labels ────────────────────────────────────────────────────
+  const labelLayer = g.append('g').attr('class', 'gen-labels');
+  generations.forEach(gen => {
+    const members = genMap.get(gen);
+    if (!members.length) return;
+    const y = (gen - 1) * GEN_GAP + NODE_H / 2;
+    labelLayer.append('text')
+      .attr('x', minX - 8)
+      .attr('y', y)
+      .attr('text-anchor', 'end')
+      .attr('dominant-baseline', 'middle')
+      .attr('font-size', 11)
+      .attr('font-family', 'Inter, sans-serif')
+      .attr('fill', COLORS.muted)
+      .attr('letter-spacing', '0.06em')
+      .text((GEN_LABELS[gen] ?? `Gen. ${gen}`).toUpperCase());
+  });
+
+  // ── Links ────────────────────────────────────────────────────────────────
+  const linkLayer = g.append('g').attr('class', 'links');
+
+  // Parent–child (solid)
+  nodes.forEach(node => {
+    const pos = positions.get(node.slug);
+    node.children.forEach(childSlug => {
+      const childPos = positions.get(childSlug);
+      if (!childPos) return;
+      const midY = (pos.y + NODE_H + childPos.y) / 2;
+      linkLayer.append('path')
+        .attr('d', `M${pos.x},${pos.y + NODE_H} C${pos.x},${midY} ${childPos.x},${midY} ${childPos.x},${childPos.y}`)
+        .attr('fill', 'none')
+        .attr('stroke', COLORS.border)
+        .attr('stroke-width', 1.5);
+    });
+  });
+
+  // Spouse (dashed)
+  const drawnSpouseLinks = new Set();
+  nodes.forEach(node => {
+    const pos = positions.get(node.slug);
+    node.spouses.forEach(spouseSlug => {
+      const key = [node.slug, spouseSlug].sort().join('|');
+      if (drawnSpouseLinks.has(key)) return;
+      drawnSpouseLinks.add(key);
+      const spousePos = positions.get(spouseSlug);
+      if (!spousePos) return;
+      const midX = (pos.x + spousePos.x) / 2;
+      const midY = pos.y + NODE_H / 2;
+      linkLayer.append('line')
+        .attr('x1', pos.x + NODE_W / 2)
+        .attr('y1', midY)
+        .attr('x2', spousePos.x - NODE_W / 2)
+        .attr('y2', midY)
+        .attr('stroke', COLORS.muted)
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '5,4');
+    });
+  });
+
+  // ── Nodes ────────────────────────────────────────────────────────────────
+  const nodeLayer = g.append('g').attr('class', 'nodes');
+
+  nodes.forEach(node => {
+    const pos = positions.get(node.slug);
+    const fillColor   = COLORS[`${node.branch}-light`];
+    const strokeColor = COLORS[node.branch];
+    const bandColor   = strokeColor;
+
+    const nodeG = nodeLayer.append('g')
+      .attr('transform', `translate(${pos.x - NODE_W / 2}, ${pos.y})`)
+      .attr('cursor', 'pointer')
+      .attr('role', 'button')
+      .attr('aria-label', node.name)
+      .on('click', () => showPanel(node));
+
+    // Card shadow / hover handled via CSS class
+    nodeG.attr('class', 'tree-node');
+
+    // Card background
+    nodeG.append('rect')
+      .attr('width', NODE_W)
+      .attr('height', NODE_H)
+      .attr('rx', 8)
+      .attr('fill', fillColor)
+      .attr('stroke', strokeColor)
+      .attr('stroke-width', 1.5);
+
+    // Top band
+    nodeG.append('rect')
+      .attr('width', NODE_W)
+      .attr('height', 4)
+      .attr('rx', 8)
+      .attr('fill', bandColor);
+
+    // Clip bottom corners of band (so only top is rounded)
+    nodeG.append('rect')
+      .attr('y', 2)
+      .attr('width', NODE_W)
+      .attr('height', 4)
+      .attr('fill', bandColor);
+
+    // Name
+    const nameParts = node.name.split(' ');
+    const lineOne = nameParts.slice(0, Math.ceil(nameParts.length / 2)).join(' ');
+    const lineTwo = nameParts.slice(Math.ceil(nameParts.length / 2)).join(' ');
+
+    if (lineTwo) {
+      nodeG.append('text')
+        .attr('x', NODE_W / 2).attr('y', NODE_H / 2 - 6)
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+        .attr('font-size', 12).attr('font-weight', 600)
+        .attr('font-family', 'Lora, Georgia, serif')
+        .attr('fill', COLORS.text)
+        .text(lineOne);
+      nodeG.append('text')
+        .attr('x', NODE_W / 2).attr('y', NODE_H / 2 + 10)
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+        .attr('font-size', 12).attr('font-weight', 600)
+        .attr('font-family', 'Lora, Georgia, serif')
+        .attr('fill', COLORS.text)
+        .text(lineTwo);
+    } else {
+      nodeG.append('text')
+        .attr('x', NODE_W / 2).attr('y', NODE_H / 2)
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+        .attr('font-size', 12).attr('font-weight', 600)
+        .attr('font-family', 'Lora, Georgia, serif')
+        .attr('fill', COLORS.text)
+        .text(node.name);
+    }
+
+    // Dates
+    if (node.born) {
+      const bornY = node.born.slice(0, 4);
+      const diedY = node.died ? `–${node.died.slice(0, 4)}` : '';
+      nodeG.append('text')
+        .attr('x', NODE_W / 2).attr('y', NODE_H - 10)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 10)
+        .attr('font-family', 'Inter, sans-serif')
+        .attr('fill', COLORS.muted)
+        .text(`${bornY}${diedY}`);
+    }
+  });
+
+  // ── Toolbar button handlers ──────────────────────────────────────────────
+  btnZoomIn.addEventListener('click',  () => svg.transition().duration(250).call(zoom.scaleBy, 1.4));
+  btnZoomOut.addEventListener('click', () => svg.transition().duration(250).call(zoom.scaleBy, 0.7));
+  btnReset.addEventListener('click',   () => svg.transition().duration(400).call(zoom.transform, initialTransform));
+}
+
+// ── Info panel ───────────────────────────────────────────────────────────────
+function showPanel(node) {
+  const branchLabels = { breton: 'Familia Bretón', guerrero: 'Familia Guerrero' };
+  const portrait  = document.getElementById('info-portrait');
+  const branchEl  = document.getElementById('info-branch');
+  const nameEl    = document.getElementById('info-name');
+  const datesEl   = document.getElementById('info-dates');
+  const placeEl   = document.getElementById('info-place');
+  const linkEl    = document.getElementById('info-link');
+
+  branchEl.textContent  = branchLabels[node.branch] ?? '';
+  branchEl.className    = `info-panel__branch branch-${node.branch}`;
+  nameEl.textContent    = node.name;
+  datesEl.textContent   = node.born
+    ? `${node.born.slice(0,4)}${node.died ? ' – ' + node.died.slice(0,4) : ''}`
+    : '';
+  placeEl.textContent   = node.birthplace ?? '';
+  linkEl.href           = `/people/${node.slug}`;
+
+  portrait.innerHTML = node.portrait
+    ? `<img src="${node.portrait}" alt="${node.name}" />`
+    : `<div class="info-portrait-placeholder info-portrait-placeholder--${node.branch}"></div>`;
+
+  panel.hidden = false;
+}
+
+document.getElementById('info-close').addEventListener('click', () => {
+  panel.hidden = true;
+});
+</script>
+
+<style>
+  .tree-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 4rem);
+    overflow: hidden;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-6);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .toolbar__title {
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-right: auto;
+  }
+
+  .toolbar__controls {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .toolbar__btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .toolbar__btn:hover {
+    background: var(--bg);
+    color: var(--text-primary);
+  }
+
+  .toolbar__legend {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+  }
+
+  .legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  .legend-dot--breton   { background: var(--breton); }
+  .legend-dot--guerrero { background: var(--guerrero); }
+
+  /* Canvas */
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  #tree-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* D3 node hover */
+  :global(.tree-node:hover rect:first-child) {
+    filter: brightness(0.96);
+  }
+
+  /* Empty state */
+  .canvas-empty {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-muted);
+    gap: var(--space-3);
+  }
+
+  .canvas-empty__sub {
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  /* Info panel */
+  .info-panel {
+    position: absolute;
+    bottom: var(--space-6);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    padding: var(--space-5) var(--space-6);
+    min-width: 340px;
+    max-width: 520px;
+    z-index: 10;
+  }
+
+  .info-panel[hidden] { display: none; }
+
+  .info-panel__close {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    width: 28px;
+    height: 28px;
+    background: none;
+    border: none;
+    font-size: 0.875rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .info-panel__close:hover {
+    background: var(--bg);
+    color: var(--text-primary);
+  }
+
+  .info-panel__portrait-wrap {
+    flex-shrink: 0;
+  }
+
+  .info-panel__portrait {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+
+  .info-panel__portrait img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  :global(.info-portrait-placeholder) {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+  }
+
+  :global(.info-portrait-placeholder--breton) {
+    background: var(--breton-light);
+    border: 2px solid var(--breton-border);
+  }
+
+  :global(.info-portrait-placeholder--guerrero) {
+    background: var(--guerrero-light);
+    border: 2px solid var(--guerrero-border);
+  }
+
+  .info-panel__branch {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: var(--space-1);
+  }
+
+  .info-panel__name {
+    font-size: 1.125rem;
+    margin-bottom: var(--space-1);
+  }
+
+  .info-panel__dates,
+  .info-panel__place {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .info-panel__link {
+    display: inline-block;
+    margin-top: var(--space-3);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--breton);
+    text-decoration: none;
+  }
+
+  .info-panel__link:hover {
+    text-decoration: underline;
+    color: var(--breton);
+  }
+
+  @media (max-width: 600px) {
+    .info-panel {
+      left: var(--space-4);
+      right: var(--space-4);
+      transform: none;
+      min-width: unset;
+    }
+  }
+</style>

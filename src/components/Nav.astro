@@ -1,0 +1,92 @@
+---
+const navLinks = [
+  { href: '/people',  label: 'Personas' },
+  { href: '/stories', label: 'Historias' },
+  { href: '/tree',    label: 'Árbol' },
+];
+
+const currentPath = Astro.url.pathname;
+---
+
+<header class="nav">
+  <div class="container nav__inner">
+    <a href="/" class="nav__logo" aria-label="Inicio">
+      <span class="nav__logo-breton">Bretón</span>
+      <span class="nav__logo-amp">&amp;</span>
+      <span class="nav__logo-guerrero">Guerrero</span>
+    </a>
+
+    <nav aria-label="Main navigation">
+      <ul class="nav__links">
+        {navLinks.map(link => (
+          <li>
+            <a
+              href={link.href}
+              class:list={['nav__link', { 'nav__link--active': currentPath.startsWith(link.href) }]}
+            >
+              {link.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .nav {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .nav__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 4rem;
+  }
+
+  .nav__logo {
+    font-family: var(--font-serif);
+    font-size: 1.25rem;
+    text-decoration: none;
+    display: flex;
+    gap: 0.35em;
+    align-items: baseline;
+  }
+
+  .nav__logo-breton   { color: var(--breton); }
+  .nav__logo-amp      { color: var(--text-muted); font-weight: 400; }
+  .nav__logo-guerrero { color: var(--guerrero); }
+
+  .nav__links {
+    list-style: none;
+    display: flex;
+    gap: var(--space-6);
+  }
+
+  .nav__link {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--text-secondary);
+    padding-block: var(--space-1);
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .nav__link:hover,
+  .nav__link--active {
+    color: var(--text-primary);
+    border-bottom-color: var(--breton);
+  }
+
+  @media (max-width: 480px) {
+    .nav__logo { font-size: 1.0625rem; }
+    .nav__links { gap: var(--space-4); }
+    .nav__link  { font-size: 0.875rem; }
+  }
+</style>

@@ -1,0 +1,318 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const stories = await getCollection('stories');
+  return stories.map(story => ({
+    params: { slug: story.data.slug },
+    props:  { story },
+  }));
+}
+
+const { story } = Astro.props;
+const { Content } = await story.render();
+const data = story.data;
+
+// Resolve related people
+const allPeople = await getCollection('people');
+const bySlug = Object.fromEntries(allPeople.map(p => [p.data.slug, p.data]));
+const relatedPeople = (data.relatedPeople ?? []).map(s => bySlug[s]).filter(Boolean);
+
+const branchLabel: Record<string, string> = {
+  breton:   'Familia Bretón',
+  guerrero: 'Familia Guerrero',
+  both:     'Ambas familias',
+};
+
+const formattedDate = new Date(data.date).toLocaleDateString('es-MX', {
+  year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+});
+---
+
+<Layout title={data.title} description={`${branchLabel[data.branch]} — ${formattedDate}`}>
+  <!-- Top band -->
+  <div class:list={['story-band', `band-${data.branch}`]} aria-hidden="true"></div>
+
+  <div class="container story">
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/stories">Historias</a>
+      <span aria-hidden="true">›</span>
+      <span aria-current="page">{data.title}</span>
+    </nav>
+
+    <div class="story__layout">
+      <!-- Main content -->
+      <article class="story__main">
+        <header class="story__header">
+          <div class="story__meta">
+            <span class:list={['story__branch-tag', `story__branch-tag--${data.branch}`]}>
+              {branchLabel[data.branch]}
+            </span>
+            <time datetime={data.date} class="story__date">{formattedDate}</time>
+          </div>
+          <h1 class="story__title">{data.title}</h1>
+          {data.author && <p class="story__author">Por {data.author}</p>}
+        </header>
+
+        {data.featuredImage && (
+          <div class="story__featured-image">
+            <img src={data.featuredImage} alt={data.title} />
+          </div>
+        )}
+
+        <div class="story__body prose">
+          <Content />
+        </div>
+      </article>
+
+      <!-- Sidebar -->
+      <aside class="story__sidebar">
+        {relatedPeople.length > 0 && (
+          <div class="sidebar-card">
+            <h2 class="sidebar-card__title">Personas relacionadas</h2>
+            <ul class="related-people">
+              {relatedPeople.map(person => (
+                <li>
+                  <a href={`/people/${person.slug}`} class="related-person">
+                    <div class="related-person__portrait">
+                      {person.portrait
+                        ? <img src={person.portrait} alt={person.name} />
+                        : <div class:list={['related-person__placeholder', `related-person__placeholder--${person.branch}`]}></div>
+                      }
+                    </div>
+                    <div class="related-person__info">
+                      <span class="related-person__name">{person.name}</span>
+                      {person.born && (
+                        <span class="related-person__dates">
+                          {person.born.slice(0,4)}{person.died ? `–${person.died.slice(0,4)}` : ''}
+                        </span>
+                      )}
+                    </div>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div class="sidebar-card">
+          <h2 class="sidebar-card__title">Detalles</h2>
+          <dl class="story-details">
+            <dt>Familia</dt>
+            <dd class:list={[`branch-${data.branch === 'both' ? 'muted' : data.branch}`]}>
+              {branchLabel[data.branch]}
+            </dd>
+            <dt>Fecha</dt>
+            <dd>{formattedDate}</dd>
+            {data.author && <><dt>Autor</dt><dd>{data.author}</dd></>}
+          </dl>
+        </div>
+      </aside>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .story-band {
+    height: 8px;
+  }
+
+  .story {
+    padding-block: var(--space-6) var(--space-16);
+  }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-8);
+    flex-wrap: wrap;
+  }
+
+  .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+  .breadcrumb a:hover { color: var(--text-primary); }
+
+  /* Layout */
+  .story__layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: var(--space-12);
+    align-items: start;
+  }
+
+  /* Header */
+  .story__meta {
+    display: flex;
+    gap: var(--space-4);
+    align-items: center;
+    margin-bottom: var(--space-4);
+    flex-wrap: wrap;
+  }
+
+  .story__branch-tag {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+
+  .story__branch-tag--breton   { background: var(--breton-light);   color: var(--breton); }
+  .story__branch-tag--guerrero { background: var(--guerrero-light); color: var(--guerrero); }
+  .story__branch-tag--both     { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+
+  .story__date {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .story__title {
+    margin-bottom: var(--space-3);
+  }
+
+  .story__author {
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: var(--space-8);
+  }
+
+  /* Featured image */
+  .story__featured-image {
+    margin-bottom: var(--space-8);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--breton-light);
+  }
+
+  .story__featured-image img {
+    width: 100%;
+    max-height: 420px;
+    object-fit: cover;
+  }
+
+  /* Body prose */
+  .story__body.prose {
+    max-width: 68ch;
+  }
+
+  .story__body.prose :global(p)  { margin-bottom: var(--space-4); }
+  .story__body.prose :global(h2) { margin-top: var(--space-10); margin-bottom: var(--space-4); }
+  .story__body.prose :global(h3) { margin-top: var(--space-8);  margin-bottom: var(--space-3); }
+  .story__body.prose :global(blockquote) {
+    border-left: 3px solid var(--breton);
+    padding-left: var(--space-6);
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-block: var(--space-6);
+  }
+
+  /* Sidebar */
+  .story__sidebar {
+    position: sticky;
+    top: calc(4rem + var(--space-6));
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .sidebar-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+  }
+
+  .sidebar-card__title {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-4);
+    font-family: var(--font-sans);
+    font-weight: 600;
+  }
+
+  /* Related people */
+  .related-people {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .related-person {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    text-decoration: none;
+    color: var(--text-primary);
+    padding: var(--space-2);
+    border-radius: var(--radius);
+    transition: background 0.15s;
+  }
+
+  .related-person:hover { background: var(--bg); color: var(--text-primary); }
+
+  .related-person__portrait {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .related-person__portrait img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .related-person__placeholder {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+  }
+
+  .related-person__placeholder--breton   { background: var(--breton-light);   border: 2px solid var(--breton-border); }
+  .related-person__placeholder--guerrero { background: var(--guerrero-light); border: 2px solid var(--guerrero-border); }
+
+  .related-person__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .related-person__name  { font-size: 0.9375rem; font-weight: 500; }
+  .related-person__dates { font-size: 0.8125rem; color: var(--text-muted); }
+
+  /* Details */
+  .story-details {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-2) var(--space-4);
+    font-size: 0.875rem;
+  }
+
+  .story-details dt { color: var(--text-muted); }
+  .story-details dd { margin: 0; }
+
+  .branch-muted { color: var(--text-muted); }
+
+  /* Responsive */
+  @media (max-width: 800px) {
+    .story__layout {
+      grid-template-columns: 1fr;
+    }
+
+    .story__sidebar {
+      position: static;
+      order: -1;
+    }
+  }
+</style>

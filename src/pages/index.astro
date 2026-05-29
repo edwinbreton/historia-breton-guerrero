@@ -1,17 +1,392 @@
 ---
+import Layout from '../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
 
+// These will be populated once content exists
+// For now we show the structure with empty/placeholder states
+let people: any[] = [];
+let stories: any[] = [];
+
+try {
+  // TinaCMS stores content in content/people and content/stories
+  // Astro content collections aren't wired yet — data comes via TinaCMS client
+  // We import statically for now; swap with TinaCMS query once Cloud is set up
+} catch {}
+
+const stats = [
+  { label: 'Personas', value: people.length || '—' },
+  { label: 'Historias', value: stories.length || '—' },
+  { label: 'Generaciones', value: '—' },
+  { label: 'Fotos', value: '—' },
+];
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Layout title="Inicio">
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container hero__inner">
+      <p class="hero__eyebrow">Una historia familiar</p>
+      <h1 class="hero__title">
+        <span class="hero__name-breton">Bretón</span>
+        <span class="hero__amp">&amp;</span>
+        <span class="hero__name-guerrero">Guerrero</span>
+      </h1>
+      <p class="hero__tagline">
+        Dos familias, una historia compartida.
+      </p>
+    </div>
+  </section>
+
+  <!-- Stats bar -->
+  <section class="stats-bar" aria-label="Estadísticas">
+    <div class="container stats-bar__inner">
+      {stats.map(stat => (
+        <div class="stats-bar__item">
+          <span class="stats-bar__value">{stat.value}</span>
+          <span class="stats-bar__label">{stat.label}</span>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Two-column branch section -->
+  <section class="branches" aria-label="Las familias">
+    <div class="container branches__inner">
+      <!-- Bretón -->
+      <div class="branch-col branch-col--breton">
+        <div class="branch-col__header">
+          <h2 class="branch-col__title">Familia Bretón</h2>
+          <a href="/people?branch=breton" class="branch-col__link">Ver todos →</a>
+        </div>
+        <div class="branch-col__cards">
+          <div class="branch-empty">
+            <p>Próximamente.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="branches__divider" aria-hidden="true"></div>
+
+      <!-- Guerrero -->
+      <div class="branch-col branch-col--guerrero">
+        <div class="branch-col__header">
+          <h2 class="branch-col__title">Familia Guerrero</h2>
+          <a href="/people?branch=guerrero" class="branch-col__link">Ver todos →</a>
+        </div>
+        <div class="branch-col__cards">
+          <div class="branch-empty">
+            <p>Próximamente.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Where the families meet -->
+  <section class="meeting" aria-labelledby="meeting-title">
+    <div class="container">
+      <h2 id="meeting-title" class="meeting__title">Donde las familias se unen</h2>
+      <p class="meeting__subtitle">
+        Algo poco común: dos hermanos Bretón se casaron con dos hermanos Guerrero,
+        uniendo a las familias dos veces.
+      </p>
+      <div class="meeting__couples">
+        <div class="meeting__couple">
+          <div class="meeting__person">
+            <div class="meeting__avatar meeting__avatar--breton"></div>
+            <p class="meeting__name">—</p>
+            <p class="meeting__family branch-breton">Bretón</p>
+          </div>
+          <div class="meeting__heart" aria-hidden="true">♥</div>
+          <div class="meeting__person">
+            <div class="meeting__avatar meeting__avatar--guerrero"></div>
+            <p class="meeting__name">—</p>
+            <p class="meeting__family branch-guerrero">Guerrero</p>
+          </div>
+        </div>
+
+        <div class="meeting__and" aria-hidden="true">y</div>
+
+        <div class="meeting__couple">
+          <div class="meeting__person">
+            <div class="meeting__avatar meeting__avatar--breton"></div>
+            <p class="meeting__name">—</p>
+            <p class="meeting__family branch-breton">Bretón</p>
+          </div>
+          <div class="meeting__heart" aria-hidden="true">♥</div>
+          <div class="meeting__person">
+            <div class="meeting__avatar meeting__avatar--guerrero"></div>
+            <p class="meeting__name">—</p>
+            <p class="meeting__family branch-guerrero">Guerrero</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Recently added -->
+  <section class="recent" aria-labelledby="recent-title">
+    <div class="container">
+      <h2 id="recent-title" class="recent__title">Agregado recientemente</h2>
+      <div class="recent__empty">
+        <p>El contenido aparecerá aquí próximamente.</p>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  /* Hero */
+  .hero {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding-block: var(--space-16) var(--space-12);
+    text-align: center;
+  }
+
+  .hero__eyebrow {
+    font-size: 0.875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-4);
+  }
+
+  .hero__title {
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    display: flex;
+    gap: 0.3em;
+    justify-content: center;
+    align-items: baseline;
+    flex-wrap: wrap;
+    margin-bottom: var(--space-6);
+  }
+
+  .hero__name-breton   { color: var(--breton); }
+  .hero__amp           { color: var(--text-muted); font-weight: 400; }
+  .hero__name-guerrero { color: var(--guerrero); }
+
+  .hero__tagline {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding-block: var(--space-6);
+  }
+
+  .stats-bar__inner {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-12);
+    flex-wrap: wrap;
+  }
+
+  .stats-bar__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .stats-bar__value {
+    font-family: var(--font-serif);
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .stats-bar__label {
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  /* Branch columns */
+  .branches {
+    padding-block: var(--space-16);
+  }
+
+  .branches__inner {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: var(--space-8);
+    align-items: start;
+  }
+
+  .branches__divider {
+    width: 1px;
+    background: var(--border);
+    align-self: stretch;
+  }
+
+  .branch-col__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-4);
+    border-bottom: 2px solid;
+  }
+
+  .branch-col--breton  .branch-col__header { border-color: var(--breton); }
+  .branch-col--guerrero .branch-col__header { border-color: var(--guerrero); }
+
+  .branch-col__title {
+    font-size: 1.25rem;
+  }
+
+  .branch-col--breton  .branch-col__title { color: var(--breton); }
+  .branch-col--guerrero .branch-col__title { color: var(--guerrero); }
+
+  .branch-col__link {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+
+  .branch-col__link:hover { color: var(--text-primary); }
+
+  .branch-empty {
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-8);
+    text-align: center;
+    color: var(--text-muted);
+  }
+
+  .branch-empty p { margin-bottom: 0; }
+
+  /* Meeting section */
+  .meeting {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding-block: var(--space-16);
+    text-align: center;
+  }
+
+  .meeting__title {
+    margin-bottom: var(--space-3);
+  }
+
+  .meeting__subtitle {
+    color: var(--text-secondary);
+    font-style: italic;
+    max-width: 480px;
+    margin-inline: auto;
+    margin-bottom: var(--space-12);
+  }
+
+  .meeting__couples {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-8);
+    flex-wrap: wrap;
+  }
+
+  .meeting__couple {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+  }
+
+  .meeting__and {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .meeting__person {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .meeting__avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    border: 3px solid;
+  }
+
+  .meeting__avatar--breton {
+    background: var(--breton-light);
+    border-color: var(--breton);
+  }
+
+  .meeting__avatar--guerrero {
+    background: var(--guerrero-light);
+    border-color: var(--guerrero);
+  }
+
+  .meeting__name {
+    font-family: var(--font-serif);
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .meeting__family {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  .meeting__heart {
+    font-size: 1.5rem;
+    color: var(--shared);
+  }
+
+  /* Recent section */
+  .recent {
+    padding-block: var(--space-16);
+  }
+
+  .recent__title {
+    margin-bottom: var(--space-8);
+  }
+
+  .recent__empty {
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-12);
+    text-align: center;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-6);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .branches__inner {
+      grid-template-columns: 1fr;
+    }
+
+    .branches__divider {
+      width: 100%;
+      height: 1px;
+      align-self: auto;
+    }
+
+    .stats-bar__inner {
+      gap: var(--space-8);
+    }
+  }
+</style>
