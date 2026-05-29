@@ -53,13 +53,24 @@ export default defineConfig({
             options: [
               { value: "breton",   label: "Bretón" },
               { value: "guerrero", label: "Guerrero" },
+              { value: "both",     label: "Ambas familias" },
             ],
           },
           {
             type: "number",
             name: "generation",
-            label: "Generación (1 = más antigua)",
+            label: "Generación",
             required: true,
+            ui: {
+              component: "select",
+              options: [
+                { value: 1, label: "Bisabuelos" },
+                { value: 2, label: "Abuelos" },
+                { value: 3, label: "Padres" },
+                { value: 4, label: "Hijos" },
+                { value: 5, label: "Nietos" },
+              ],
+            },
           },
           {
             type: "datetime",

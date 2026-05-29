@@ -27,7 +27,7 @@ const allStories = await getCollection('stories');
 const relatedStories = allStories.filter(s => s.data.relatedPeople?.includes(data.slug));
 
 const isBranch = (b: string) => data.branch === b;
-const branchLabel = data.branch === 'breton' ? 'Familia Bretón' : 'Familia Guerrero';
+const branchLabel = data.branch === 'breton' ? 'Familia Bretón' : data.branch === 'guerrero' ? 'Familia Guerrero' : 'Ambas familias';
 
 function formatDate(str?: string) {
   if (!str) return null;
@@ -211,6 +211,9 @@ const generationLabel = generationLabels[data.generation] ?? `Generación ${data
   }
   .profile-band--breton   { background: var(--breton); }
   .profile-band--guerrero { background: var(--guerrero); }
+  .profile-band--both {
+    background: linear-gradient(to right, var(--breton) 50%, var(--guerrero) 50%);
+  }
 
   .profile {
     padding-block: var(--space-6) var(--space-16);
@@ -286,6 +289,7 @@ const generationLabel = generationLabels[data.generation] ?? `Generación ${data
 
   .family-tag--breton   { background: var(--breton-light);   color: var(--breton); }
   .family-tag--guerrero { background: var(--guerrero-light); color: var(--guerrero); }
+  .family-tag--both     { background: var(--bg); color: var(--text-secondary); border: 1px solid var(--shared); }
 
   .profile-hero__name {
     margin-bottom: var(--space-2);

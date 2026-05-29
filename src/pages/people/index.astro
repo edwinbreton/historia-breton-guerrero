@@ -12,6 +12,7 @@ const sorted = allPeople.sort((a, b) => {
 
 const breton   = sorted.filter(p => p.data.branch === 'breton');
 const guerrero = sorted.filter(p => p.data.branch === 'guerrero');
+const both     = sorted.filter(p => p.data.branch === 'both');
 ---
 
 <Layout title="Personas">
@@ -34,6 +35,9 @@ const guerrero = sorted.filter(p => p.data.branch === 'guerrero');
         </button>
         <button class="chip chip-guerrero" data-filter="guerrero" role="tab" aria-selected="false">
           Familia Guerrero
+        </button>
+        <button class="chip chip-neutral" data-filter="both" role="tab" aria-selected="false">
+          Ambas familias
         </button>
       </div>
 
@@ -112,6 +116,43 @@ const guerrero = sorted.filter(p => p.data.branch === 'guerrero');
               ))}
             </div>
           </section>
+
+          <!-- Both section -->
+          {both.length > 0 && (
+            <section class="branch-section" data-branch="both" aria-labelledby="both-heading">
+              <h2 id="both-heading" class="branch-heading branch-heading--both">
+                Ambas familias
+                <span class="branch-heading__count">{both.length}</span>
+              </h2>
+              <div class="people-grid">
+                {both.map(person => (
+                  <a href={`/people/${person.data.slug}`} class="person-card person-card--both">
+                    <div class="person-card__band band-both" aria-hidden="true"></div>
+                    <div class="person-card__body">
+                      <div class="person-card__portrait">
+                        {person.data.portrait
+                          ? <img src={person.data.portrait} alt={person.data.name} />
+                          : <div class="person-card__portrait-placeholder person-card__portrait-placeholder--both"></div>
+                        }
+                      </div>
+                      <div class="person-card__info">
+                        <h3 class="person-card__name">{person.data.name}</h3>
+                        {person.data.born && (
+                          <p class="person-card__dates">
+                            {person.data.born.slice(0, 4)}
+                            {person.data.died ? ` – ${person.data.died.slice(0, 4)}` : ''}
+                          </p>
+                        )}
+                        {person.data.birthplace && (
+                          <p class="person-card__place">{person.data.birthplace}</p>
+                        )}
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
         </>
       )}
     </div>
@@ -188,8 +229,9 @@ const guerrero = sorted.filter(p => p.data.branch === 'guerrero');
     border-bottom: 2px solid;
   }
 
-  .branch-heading--breton  { color: var(--breton);   border-color: var(--breton); }
-  .branch-heading--guerrero { color: var(--guerrero); border-color: var(--guerrero); }
+  .branch-heading--breton   { color: var(--breton);        border-color: var(--breton); }
+  .branch-heading--guerrero { color: var(--guerrero);      border-color: var(--guerrero); }
+  .branch-heading--both     { color: var(--text-primary);  border-color: var(--shared); }
 
   .branch-heading__count {
     font-family: var(--font-sans);
@@ -260,8 +302,9 @@ const guerrero = sorted.filter(p => p.data.branch === 'guerrero');
     border-radius: 50%;
   }
 
-  .person-card__portrait-placeholder--breton  { background: var(--breton-light);   border: 2px solid var(--breton-border); }
+  .person-card__portrait-placeholder--breton   { background: var(--breton-light);   border: 2px solid var(--breton-border); }
   .person-card__portrait-placeholder--guerrero { background: var(--guerrero-light); border: 2px solid var(--guerrero-border); }
+  .person-card__portrait-placeholder--both     { background: var(--bg);            border: 2px solid var(--shared); }
 
   .person-card__name {
     font-size: 1rem;
