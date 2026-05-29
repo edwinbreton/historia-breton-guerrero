@@ -9,7 +9,7 @@ const nodes = allPeople.map(p => ({
   slug:       p.id,
   name:       p.data.name,
   branch:     p.data.branch,
-  generation: p.data.generation,
+  generation: Number(p.data.generation),
   born:       p.data.born  ?? null,
   died:       p.data.died  ?? null,
   birthplace: p.data.birthplace ?? null,

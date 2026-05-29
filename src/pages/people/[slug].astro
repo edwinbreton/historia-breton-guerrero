@@ -36,12 +36,12 @@ function formatDate(str?: string) {
   return d.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 }
 
-const generationLabels: Record<number, string> = {
-  1: 'Bisabuelos',
-  2: 'Abuelos',
-  3: 'Padres',
-  4: 'Hijos',
-  5: 'Nietos',
+const generationLabels: Record<string, string> = {
+  '1': 'Bisabuelos',
+  '2': 'Abuelos',
+  '3': 'Padres',
+  '4': 'Hijos',
+  '5': 'Nietos',
 };
 const generationLabel = generationLabels[data.generation] ?? `Generación ${data.generation}`;
 ---

@@ -6,7 +6,7 @@ const allPeople = await getCollection('people');
 
 // Sort by generation then name
 const sorted = allPeople.sort((a, b) => {
-  if (a.data.generation !== b.data.generation) return a.data.generation - b.data.generation;
+  if (a.data.generation !== b.data.generation) return Number(a.data.generation) - Number(b.data.generation);
   return a.data.name.localeCompare(b.data.name, 'es');
 });
 

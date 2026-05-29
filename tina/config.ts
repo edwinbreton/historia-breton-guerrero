@@ -69,20 +69,17 @@ export default defineConfig({
             ],
           },
           {
-            type: "number",
+            type: "string",
             name: "generation",
             label: "Generación",
             required: true,
-            ui: {
-              component: "select",
-              options: [
-                { value: 1, label: "Bisabuelos" },
-                { value: 2, label: "Abuelos" },
-                { value: 3, label: "Padres" },
-                { value: 4, label: "Hijos" },
-                { value: 5, label: "Nietos" },
-              ],
-            },
+            options: [
+              { value: "1", label: "Bisabuelos" },
+              { value: "2", label: "Abuelos" },
+              { value: "3", label: "Padres" },
+              { value: "4", label: "Hijos" },
+              { value: "5", label: "Nietos" },
+            ],
           },
           {
             type: "datetime",
