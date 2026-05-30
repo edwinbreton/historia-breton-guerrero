@@ -28,7 +28,7 @@ if (Astro.request.method === 'POST') {
   if (!fields.date)   errors.push('La fecha es requerida.');
 
   if (errors.length === 0) {
-    const slug = saveStory({
+    const slug = await saveStory({
       ...fields,
       relatedPeople: fields.relatedPeople ? fields.relatedPeople.split(',').filter(Boolean) : [],
     }, user?.username ?? 'unknown');

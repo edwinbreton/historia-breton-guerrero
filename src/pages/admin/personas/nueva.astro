@@ -32,7 +32,7 @@ if (Astro.request.method === 'POST') {
       portraitPath = await saveUploadedFile(portraitFile, 'people');
     }
 
-    const slug = savePerson({
+    const slug = await savePerson({
       ...fields,
       portrait: portraitPath,
       deceased: fields.deceased === '1',

@@ -29,7 +29,7 @@ if (Astro.request.method === 'POST') {
 
   // Handle delete
   if (fields._action === 'delete') {
-    deletePerson(slug!, user?.username ?? 'unknown');
+    await deletePerson(slug!, user?.username ?? 'unknown');
     return Astro.redirect('/admin?deleted=1');
   }
 
@@ -45,7 +45,7 @@ if (Astro.request.method === 'POST') {
       portraitPath = await saveUploadedFile(portraitFile, 'people');
     }
 
-    savePerson({
+    await savePerson({
       ...fields,
       portrait: portraitPath,
       deceased: fields.deceased === '1',

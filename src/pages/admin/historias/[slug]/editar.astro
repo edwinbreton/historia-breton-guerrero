@@ -31,7 +31,7 @@ if (Astro.request.method === 'POST') {
   }
 
   if (fields._action === 'delete') {
-    deleteStory(slug!, user?.username ?? 'unknown');
+    await deleteStory(slug!, user?.username ?? 'unknown');
     return Astro.redirect('/admin?deleted=1');
   }
 
@@ -40,7 +40,7 @@ if (Astro.request.method === 'POST') {
   if (!fields.date)   errors.push('La fecha es requerida.');
 
   if (errors.length === 0) {
-    saveStory({
+    await saveStory({
       ...fields,
       relatedPeople: fields.relatedPeople ? fields.relatedPeople.split(',').filter(Boolean) : [],
     }, user?.username ?? 'unknown');

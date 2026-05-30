@@ -1,22 +1,12 @@
-import { writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import { join, extname } from 'node:path';
 
-const REPO_ROOT = process.cwd();
+const REPO_ROOT  = process.cwd();
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const REPO_OWNER   = 'edwinbreton';
+const REPO_NAME    = 'historia-breton-guerrero';
+const BRANCH       = 'main';
 
-export async function saveUploadedFile(file: File, folder: string): Promise<string> {
-  const ext     = extname(file.name) || '.jpg';
-  const slug    = slugify(file.name.replace(/\.[^.]+$/, ''));
-  const filename = `${slug}-${Date.now()}${ext}`;
-  const dir      = join(REPO_ROOT, 'public', 'uploads', folder);
-  const filePath = join(dir, filename);
-
-  mkdirSync(dir, { recursive: true });
-  const buffer = Buffer.from(await file.arrayBuffer());
-  writeFileSync(filePath, buffer);
-
-  return `/uploads/${folder}/${filename}`;
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function slugify(text: string): string {
   return text
@@ -27,7 +17,7 @@ function slugify(text: string): string {
     .replace(/(^-|-$)/g, '');
 }
 
-function toMdxFrontmatter(data: Record<string, any>): string {
+function toFrontmatter(data: Record<string, any>): string {
   const lines: string[] = ['---'];
 
   for (const [key, value] of Object.entries(data)) {
@@ -55,13 +45,152 @@ function toMdxFrontmatter(data: Record<string, any>): string {
   return lines.join('\n');
 }
 
-export function savePerson(data: Record<string, any>, editor: string): string {
+const isNetlify = !!process.env.NETLIFY || !!GITHUB_TOKEN && !isLocal();
+
+function isLocal(): boolean {
+  try {
+    const { writeFileSync } = require('node:fs');
+    writeFileSync('/tmp/bg-test', '');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ── GitHub API ────────────────────────────────────────────────────────────────
+
+async function githubWrite(path: string, content: string, message: string): Promise<void> {
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`;
+
+  // Get existing file SHA if it exists (needed for updates)
+  let sha: string | undefined;
+  const getRes = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+    },
+  });
+  if (getRes.ok) {
+    const existing = await getRes.json() as { sha: string };
+    sha = existing.sha;
+  }
+
+  const body: Record<string, any> = {
+    message,
+    content: btoa(unescape(encodeURIComponent(content))),
+    branch:  BRANCH,
+  };
+  if (sha) body.sha = sha;
+
+  const res = await fetch(url, {
+    method:  'PUT',
+    headers: {
+      Authorization:  `Bearer ${GITHUB_TOKEN}`,
+      Accept:         'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`GitHub API error: ${res.status} ${err}`);
+  }
+}
+
+async function githubDelete(path: string, message: string): Promise<void> {
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`;
+
+  const getRes = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+    },
+  });
+
+  if (!getRes.ok) return; // already gone
+
+  const existing = await getRes.json() as { sha: string };
+
+  const res = await fetch(url, {
+    method:  'DELETE',
+    headers: {
+      Authorization:  `Bearer ${GITHUB_TOKEN}`,
+      Accept:         'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message, sha: existing.sha, branch: BRANCH }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`GitHub API delete error: ${res.status} ${err}`);
+  }
+}
+
+// ── Local filesystem ──────────────────────────────────────────────────────────
+
+function localWrite(filePath: string, content: string, message: string): void {
+  const { writeFileSync, mkdirSync } = require('node:fs');
+  const { dirname } = require('node:path');
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, content, 'utf-8');
+  try {
+    execSync(`git add "${filePath}"`, { cwd: REPO_ROOT });
+    execSync(`git commit -m "${message}"`, { cwd: REPO_ROOT });
+  } catch {
+    // silently skip in dev
+  }
+}
+
+function localDelete(filePath: string, message: string): void {
+  const { unlinkSync } = require('node:fs');
+  try { unlinkSync(filePath); } catch {}
+  try {
+    execSync(`git rm "${filePath}"`, { cwd: REPO_ROOT });
+    execSync(`git commit -m "${message}"`, { cwd: REPO_ROOT });
+  } catch {}
+}
+
+// ── File upload ───────────────────────────────────────────────────────────────
+
+export async function saveUploadedFile(file: File, folder: string): Promise<string> {
+  const { extname } = require('node:path');
+  const ext      = extname(file.name) || '.jpg';
+  const slug     = slugify(file.name.replace(/\.[^.]+$/, ''));
+  const filename = `${slug}-${Date.now()}${ext}`;
+  const repoPath = `public/uploads/${folder}/${filename}`;
+  const buffer   = Buffer.from(await file.arrayBuffer());
+
+  if (GITHUB_TOKEN) {
+    // Upload via GitHub API
+    await githubWrite(
+      repoPath,
+      buffer.toString('base64'),
+      `[upload] ${filename}`
+    );
+  } else {
+    // Local: write directly
+    const { join } = require('node:path');
+    const { writeFileSync, mkdirSync } = require('node:fs');
+    const dir = join(REPO_ROOT, 'public', 'uploads', folder);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, filename), buffer);
+  }
+
+  return `/uploads/${folder}/${filename}`;
+}
+
+// ── Person ────────────────────────────────────────────────────────────────────
+
+export async function savePerson(data: Record<string, any>, editor: string): Promise<string> {
   const slug = data.existingSlug || slugify(data.name);
-  const frontmatter = toMdxFrontmatter({
+  const frontmatter = toFrontmatter({
     name:       data.name,
     branch:     data.branch,
     generation: data.generation,
     born:       data.born       || null,
+    deceased:   data.deceased   || null,
     died:       data.died       || null,
     birthplace: data.birthplace || null,
     occupation: data.occupation || null,
@@ -73,23 +202,36 @@ export function savePerson(data: Record<string, any>, editor: string): string {
 
   const body    = data.bio ? `\n${data.bio}\n` : '';
   const content = `${frontmatter}\n${body}`;
-  const filePath = join(REPO_ROOT, 'src', 'content', 'people', `${slug}.md`);
+  const repoPath = `src/content/people/${slug}.md`;
+  const message  = `[${editor}] Guardó persona: ${data.name}`;
 
-  writeFileSync(filePath, content, 'utf-8');
-  gitCommit(`src/content/people/${slug}.md`, `[${editor}] Guardó persona: ${data.name}`);
+  if (GITHUB_TOKEN) {
+    await githubWrite(repoPath, content, message);
+  } else {
+    const { join } = require('node:path');
+    localWrite(join(REPO_ROOT, repoPath), content, message);
+  }
 
   return slug;
 }
 
-export function deletePerson(slug: string, editor: string): void {
-  const filePath = join(REPO_ROOT, 'src', 'content', 'people', `${slug}.md`);
-  unlinkSync(filePath);
-  gitCommitDelete(`src/content/people/${slug}.md`, `[${editor}] Eliminó persona: ${slug}`);
+export async function deletePerson(slug: string, editor: string): Promise<void> {
+  const repoPath = `src/content/people/${slug}.md`;
+  const message  = `[${editor}] Eliminó persona: ${slug}`;
+
+  if (GITHUB_TOKEN) {
+    await githubDelete(repoPath, message);
+  } else {
+    const { join } = require('node:path');
+    localDelete(join(REPO_ROOT, repoPath), message);
+  }
 }
 
-export function saveStory(data: Record<string, any>, editor: string): string {
+// ── Story ─────────────────────────────────────────────────────────────────────
+
+export async function saveStory(data: Record<string, any>, editor: string): Promise<string> {
   const slug = data.existingSlug || slugify(data.title);
-  const frontmatter = toMdxFrontmatter({
+  const frontmatter = toFrontmatter({
     title:         data.title,
     branch:        data.branch,
     date:          data.date,
@@ -100,35 +242,27 @@ export function saveStory(data: Record<string, any>, editor: string): string {
 
   const body    = data.body ? `\n${data.body}\n` : '';
   const content = `${frontmatter}\n${body}`;
-  const filePath = join(REPO_ROOT, 'src', 'content', 'stories', `${slug}.md`);
+  const repoPath = `src/content/stories/${slug}.md`;
+  const message  = `[${editor}] Guardó historia: ${data.title}`;
 
-  writeFileSync(filePath, content, 'utf-8');
-  gitCommit(`src/content/stories/${slug}.md`, `[${editor}] Guardó historia: ${data.title}`);
+  if (GITHUB_TOKEN) {
+    await githubWrite(repoPath, content, message);
+  } else {
+    const { join } = require('node:path');
+    localWrite(join(REPO_ROOT, repoPath), content, message);
+  }
 
   return slug;
 }
 
-export function deleteStory(slug: string, editor: string): void {
-  const filePath = join(REPO_ROOT, 'src', 'content', 'stories', `${slug}.md`);
-  unlinkSync(filePath);
-  gitCommitDelete(`src/content/stories/${slug}.md`, `[${editor}] Eliminó historia: ${slug}`);
-}
+export async function deleteStory(slug: string, editor: string): Promise<void> {
+  const repoPath = `src/content/stories/${slug}.md`;
+  const message  = `[${editor}] Eliminó historia: ${slug}`;
 
-function gitCommit(filePath: string, message: string): void {
-  try {
-    execSync(`git add "${filePath}"`, { cwd: REPO_ROOT });
-    execSync(`git commit -m "${message}"`, { cwd: REPO_ROOT });
-  } catch (e) {
-    // In local dev git may not be configured — fail silently
-    console.warn('Git commit skipped:', e);
-  }
-}
-
-function gitCommitDelete(filePath: string, message: string): void {
-  try {
-    execSync(`git rm "${filePath}"`, { cwd: REPO_ROOT });
-    execSync(`git commit -m "${message}"`, { cwd: REPO_ROOT });
-  } catch (e) {
-    console.warn('Git commit skipped:', e);
+  if (GITHUB_TOKEN) {
+    await githubDelete(repoPath, message);
+  } else {
+    const { join } = require('node:path');
+    localDelete(join(REPO_ROOT, repoPath), message);
   }
 }
