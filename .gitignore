@@ -27,3 +27,11 @@ node_modules
 tina/__generated__
 # Local Netlify folder
 .netlify
+
+# Local content — kept separate from deployed site
+# Add real content via the admin panel on the live site
+src/content/people/*.md
+src/content/stories/*.md
+
+# Uploaded media (local only)
+public/uploads/

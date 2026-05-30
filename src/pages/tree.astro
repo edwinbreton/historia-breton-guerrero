@@ -38,7 +38,7 @@ const nodes = allPeople.map(p => ({
     </div>
 
     <!-- Canvas -->
-    <div class="canvas-wrap" id="canvas-wrap">
+    <div class="canvas-wrap" id="canvas-wrap" data-nodes={JSON.stringify(nodes)}>
       <svg id="tree-svg" aria-label="Árbol genealógico interactivo"></svg>
       <div class="canvas-empty" id="canvas-empty">
         <p>No hay personas registradas todavía.</p>
@@ -63,7 +63,9 @@ const nodes = allPeople.map(p => ({
   </div>
 </Layout>
 
-<script define:vars={{ nodes }}>
+<script>
+const nodes = JSON.parse(document.getElementById('canvas-wrap')!.dataset.nodes ?? '[]');
+
 import * as d3 from 'd3';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -79,6 +81,9 @@ const COLORS = {
   guerrero:          '#5A7270',
   'guerrero-light':  '#E8F0EF',
   'guerrero-border': '#D0E0DE',
+  both:          '#9B8FA0',
+  'both-light':  '#F0ECF2',
+  'both-border': '#DDD5E0',
   text:    '#2A2A24',
   muted:   '#B0ADA4',
   surface: '#FFFFFF',
@@ -239,52 +244,91 @@ function buildTree() {
       .attr('stroke', strokeColor)
       .attr('stroke-width', 1.5);
 
-    // Top band
-    nodeG.append('rect')
-      .attr('width', NODE_W)
-      .attr('height', 4)
-      .attr('rx', 8)
-      .attr('fill', bandColor);
+    // Top band — gradient for 'both' branch
+    if (node.branch === 'both') {
+      // Define gradient once
+      const gradId = 'band-both-gradient';
+      if (!document.getElementById(gradId)) {
+        const defs = svg.select('defs').empty() ? svg.append('defs') : svg.select('defs');
+        const grad = defs.append('linearGradient')
+          .attr('id', gradId)
+          .attr('x1', '0%').attr('y1', '0%')
+          .attr('x2', '100%').attr('y2', '0%');
+        grad.append('stop').attr('offset', '50%').attr('stop-color', COLORS.breton);
+        grad.append('stop').attr('offset', '50%').attr('stop-color', COLORS.guerrero);
+      }
+      nodeG.append('rect').attr('width', NODE_W).attr('height', 4).attr('rx', 8).attr('fill', `url(#${gradId})`);
+      nodeG.append('rect').attr('y', 2).attr('width', NODE_W).attr('height', 4).attr('fill', `url(#${gradId})`);
+    } else {
+      nodeG.append('rect').attr('width', NODE_W).attr('height', 4).attr('rx', 8).attr('fill', bandColor);
+      nodeG.append('rect').attr('y', 2).attr('width', NODE_W).attr('height', 4).attr('fill', bandColor);
+    }
 
-    // Clip bottom corners of band (so only top is rounded)
-    nodeG.append('rect')
-      .attr('y', 2)
-      .attr('width', NODE_W)
-      .attr('height', 4)
-      .attr('fill', bandColor);
+    // Portrait (if available)
+    const PORTRAIT_R = 20; // radius
+    const PORTRAIT_X = 18 + PORTRAIT_R; // center x
+    const PORTRAIT_Y = NODE_H / 2 + 2;  // center y
+    const textX = node.portrait ? PORTRAIT_X * 2 + 8 : NODE_W / 2;
+    const textAnchor = node.portrait ? 'start' : 'middle';
+    const textMaxW = node.portrait ? NODE_W - PORTRAIT_X * 2 - 16 : NODE_W - 16;
 
-    // Name
-    const nameParts = node.name.split(' ');
-    const lineOne = nameParts.slice(0, Math.ceil(nameParts.length / 2)).join(' ');
-    const lineTwo = nameParts.slice(Math.ceil(nameParts.length / 2)).join(' ');
+    if (node.portrait) {
+      const clipId = `clip-${node.slug}`;
+      const defs = svg.select('defs').empty() ? svg.append('defs') : svg.select('defs');
+      defs.append('clipPath').attr('id', clipId)
+        .append('circle')
+        .attr('cx', PORTRAIT_X).attr('cy', PORTRAIT_Y).attr('r', PORTRAIT_R);
+
+      // Portrait border circle
+      nodeG.append('circle')
+        .attr('cx', PORTRAIT_X).attr('cy', PORTRAIT_Y).attr('r', PORTRAIT_R + 1.5)
+        .attr('fill', strokeColor);
+
+      nodeG.append('image')
+        .attr('href', node.portrait)
+        .attr('x', PORTRAIT_X - PORTRAIT_R).attr('y', PORTRAIT_Y - PORTRAIT_R)
+        .attr('width', PORTRAIT_R * 2).attr('height', PORTRAIT_R * 2)
+        .attr('clip-path', `url(#${clipId})`);
+    }
+
+    // Name — split into first name(s) and last name(s)
+    const nameParts = node.name.trim().split(' ');
+    const lineOne = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0];
+    const lineTwo = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
 
     if (lineTwo) {
       nodeG.append('text')
-        .attr('x', NODE_W / 2).attr('y', NODE_H / 2 - 6)
-        .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
-        .attr('font-size', 12).attr('font-weight', 600)
+        .attr('x', textX).attr('y', NODE_H / 2 - 6)
+        .attr('text-anchor', textAnchor).attr('dominant-baseline', 'middle')
+        .attr('font-size', 11).attr('font-weight', 600)
         .attr('font-family', 'Lora, Georgia, serif')
         .attr('fill', COLORS.text)
+        .attr('textLength', Math.min(lineOne.length * 6.5, textMaxW))
+        .attr('lengthAdjust', 'spacingAndGlyphs')
         .text(lineOne);
       nodeG.append('text')
-        .attr('x', NODE_W / 2).attr('y', NODE_H / 2 + 10)
-        .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
-        .attr('font-size', 12).attr('font-weight', 600)
+        .attr('x', textX).attr('y', NODE_H / 2 + 9)
+        .attr('text-anchor', textAnchor).attr('dominant-baseline', 'middle')
+        .attr('font-size', 11).attr('font-weight', 600)
         .attr('font-family', 'Lora, Georgia, serif')
         .attr('fill', COLORS.text)
+        .attr('textLength', Math.min(lineTwo.length * 6.5, textMaxW))
+        .attr('lengthAdjust', 'spacingAndGlyphs')
         .text(lineTwo);
     } else {
       nodeG.append('text')
-        .attr('x', NODE_W / 2).attr('y', NODE_H / 2)
-        .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
-        .attr('font-size', 12).attr('font-weight', 600)
+        .attr('x', textX).attr('y', NODE_H / 2)
+        .attr('text-anchor', textAnchor).attr('dominant-baseline', 'middle')
+        .attr('font-size', 11).attr('font-weight', 600)
         .attr('font-family', 'Lora, Georgia, serif')
         .attr('fill', COLORS.text)
+        .attr('textLength', Math.min(node.name.length * 6.5, textMaxW))
+        .attr('lengthAdjust', 'spacingAndGlyphs')
         .text(node.name);
     }
 
-    // Dates
-    if (node.born) {
+    // Dates — only show when no portrait (space constraint)
+    if (node.born && !node.portrait) {
       const bornY = node.born.slice(0, 4);
       const diedY = node.died ? `–${node.died.slice(0, 4)}` : '';
       nodeG.append('text')
@@ -448,8 +492,10 @@ document.getElementById('info-close').addEventListener('click', () => {
   .info-panel {
     position: absolute;
     bottom: var(--space-6);
-    left: 50%;
-    transform: translateX(-50%);
+    left: var(--space-6);
+    right: var(--space-6);
+    max-width: 480px;
+    margin-inline: auto;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -458,8 +504,6 @@ document.getElementById('info-close').addEventListener('click', () => {
     align-items: center;
     gap: var(--space-6);
     padding: var(--space-5) var(--space-6);
-    min-width: 340px;
-    max-width: 520px;
     z-index: 10;
   }
 
@@ -489,13 +533,15 @@ document.getElementById('info-close').addEventListener('click', () => {
 
   .info-panel__portrait-wrap {
     flex-shrink: 0;
+    padding: var(--space-1);
   }
 
   .info-panel__portrait {
-    width: 64px;
-    height: 64px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     overflow: hidden;
+    flex-shrink: 0;
   }
 
   .info-panel__portrait img {

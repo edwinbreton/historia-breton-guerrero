@@ -1,0 +1,199 @@
+---
+import '../../styles/global.css';
+import { ADMIN_COOKIE, COOKIE_MAX_AGE, validateLogin, encodeSession } from '../../lib/admin-auth';
+
+let error = false;
+
+if (Astro.request.method === 'POST') {
+  const contentType = Astro.request.headers.get('content-type') ?? '';
+  let username = '', password = '';
+
+  if (contentType.includes('application/x-www-form-urlencoded')) {
+    const body = await Astro.request.text();
+    const params = new URLSearchParams(body);
+    username = params.get('username') ?? '';
+    password = params.get('password') ?? '';
+  } else if (contentType.includes('multipart/form-data')) {
+    const form = await Astro.request.formData();
+    username = form.get('username')?.toString() ?? '';
+    password = form.get('password')?.toString() ?? '';
+  }
+
+  const user = validateLogin(username, password);
+
+  if (user) {
+    Astro.cookies.set(ADMIN_COOKIE, encodeSession(user), {
+      httpOnly: true,
+      secure:   true,
+      sameSite: 'lax',
+      maxAge:   COOKIE_MAX_AGE,
+      path:     '/',
+    });
+    const redirect = Astro.url.searchParams.get('redirect') ?? '/admin';
+    return Astro.redirect(redirect);
+  }
+
+  error = true;
+}
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Admin — Bretón &amp; Guerrero</title>
+  </head>
+  <body class="login-body">
+    <div class="login-card">
+      <div class="login-card__header">
+        <p class="login-logo">
+          <span class="login-logo__breton">Bretón</span>
+          <span class="login-logo__amp">&amp;</span>
+          <span class="login-logo__guerrero">Guerrero</span>
+        </p>
+        <h1 class="login-title">Panel de administración</h1>
+        <p class="login-subtitle">Acceso restringido a editores.</p>
+      </div>
+
+      <form method="POST" enctype="application/x-www-form-urlencoded" class="login-form">
+        <div class="login-field">
+          <label for="username" class="login-label">Usuario</label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            class="login-input"
+            autocomplete="username"
+            autofocus
+            required
+          />
+        </div>
+        <div class="login-field">
+          <label for="password" class="login-label">Contraseña</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            class:list={['login-input', { 'login-input--error': error }]}
+            autocomplete="current-password"
+            required
+          />
+          {error && (
+            <p class="login-error" role="alert">Usuario o contraseña incorrectos.</p>
+          )}
+        </div>
+        <button type="submit" class="login-btn">Entrar</button>
+      </form>
+    </div>
+  </body>
+</html>
+
+<style>
+  .login-body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    padding: var(--space-6);
+  }
+
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-12);
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+  }
+
+  .login-card__header {
+    text-align: center;
+    margin-bottom: var(--space-10);
+  }
+
+  .login-logo {
+    font-family: var(--font-serif);
+    font-size: 1.375rem;
+    display: flex;
+    justify-content: center;
+    gap: 0.35em;
+    margin-bottom: var(--space-4);
+  }
+
+  .login-logo__breton   { color: var(--breton); }
+  .login-logo__amp      { color: var(--text-muted); }
+  .login-logo__guerrero { color: var(--guerrero); }
+
+  .login-title {
+    font-size: 1.25rem;
+    margin-bottom: var(--space-2);
+  }
+
+  .login-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    margin: 0;
+  }
+
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+  }
+
+  .login-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .login-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .login-input {
+    width: 100%;
+    padding: var(--space-4) var(--space-4);
+    font-size: 1rem;
+    font-family: var(--font-sans);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text-primary);
+    transition: border-color 0.15s;
+  }
+
+  .login-input:focus {
+    outline: none;
+    border-color: var(--breton);
+  }
+
+  .login-input--error { border-color: #c0392b; }
+
+  .login-error {
+    font-size: 0.875rem;
+    color: #c0392b;
+    margin: 0;
+  }
+
+  .login-btn {
+    padding: var(--space-4) var(--space-6);
+    background: var(--breton);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .login-btn:hover { opacity: 0.85; }
+</style>

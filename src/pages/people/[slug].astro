@@ -1,19 +1,13 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { getCollection } from 'astro:content';
+import { getCollection, getEntry, render } from 'astro:content';
 
-export async function getStaticPaths() {
-  const people = await getCollection('people');
-  return people.map(person => ({
-    params: { slug: person.id },
-    props:  { person },
-  }));
-}
+const { slug } = Astro.params;
+const person = await getEntry('people', slug!);
+if (!person) return Astro.redirect('/people');
 
-const { person } = Astro.props;
-const { Content } = await person.render();
+const { Content } = await render(person);
 const data = person.data;
-const slug = person.id;
 
 // Resolve family relationship names from slugs
 const allPeople = await getCollection('people');
@@ -92,7 +86,7 @@ const generationLabel = generationLabels[data.generation] ?? `Generación ${data
     <!-- About panel -->
     <div id="panel-about" class="tab-panel" role="tabpanel">
       <!-- Biography -->
-      {person.body.trim() ? (
+      {person.body?.trim() ? (
         <div class="bio prose">
           <Content />
         </div>

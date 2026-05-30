@@ -1,28 +1,39 @@
 import { defineMiddleware } from 'astro:middleware';
 
-const PUBLIC_PATHS = ['/login'];
-const COOKIE_NAME  = 'bg_session';
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+const PUBLIC_COOKIE  = 'bg_session';
+const ADMIN_COOKIE   = 'bg_admin_session';
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
 
-  // Always allow the login page and static assets
-  if (
-    PUBLIC_PATHS.includes(pathname) ||
-    pathname.startsWith('/_astro/') ||
-    pathname.startsWith('/admin/') ||
-    pathname.startsWith('/uploads/')
-  ) {
+  // Always allow static assets
+  if (pathname.startsWith('/_astro/') || pathname.startsWith('/uploads/')) {
     return next();
   }
 
-  const session = context.cookies.get(COOKIE_NAME);
-  if (session?.value === 'authenticated') {
+  // ── Admin routes ─────────────────────────────────────────────────────────
+  if (pathname.startsWith('/admin')) {
+    // Login page is always accessible
+    if (pathname === '/admin/login') return next();
+
+    const adminSession = context.cookies.get(ADMIN_COOKIE);
+    if (adminSession?.value) {
+      return next();
+    }
+
+    const loginUrl = new URL('/admin/login', context.url);
+    loginUrl.searchParams.set('redirect', pathname);
+    return context.redirect(loginUrl.toString());
+  }
+
+  // ── Public routes ─────────────────────────────────────────────────────────
+  if (pathname === '/login') return next();
+
+  const publicSession = context.cookies.get(PUBLIC_COOKIE);
+  if (publicSession?.value === 'authenticated') {
     return next();
   }
 
-  // Not authenticated — redirect to login, preserving destination
   const loginUrl = new URL('/login', context.url);
   loginUrl.searchParams.set('redirect', pathname);
   return context.redirect(loginUrl.toString());

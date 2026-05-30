@@ -1,17 +1,12 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { getCollection } from 'astro:content';
+import { getCollection, getEntry, render } from 'astro:content';
 
-export async function getStaticPaths() {
-  const stories = await getCollection('stories');
-  return stories.map(story => ({
-    params: { slug: story.id },
-    props:  { story },
-  }));
-}
+const { slug } = Astro.params;
+const story = await getEntry('stories', slug!);
+if (!story) return Astro.redirect('/stories');
 
-const { story } = Astro.props;
-const { Content } = await story.render();
+const { Content } = await render(story);
 const data = story.data;
 
 // Resolve related people

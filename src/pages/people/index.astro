@@ -175,7 +175,10 @@ const both     = sorted.filter(p => p.data.branch === 'both');
       btn.setAttribute('aria-selected', 'true');
 
       sections.forEach(section => {
-        const show = filter === 'all' || section.dataset.branch === filter;
+        const branch = section.dataset.branch!;
+        const show = filter === 'all'
+          || branch === filter
+          || (branch === 'both' && (filter === 'breton' || filter === 'guerrero'));
         section.style.display = show ? '' : 'none';
       });
     });

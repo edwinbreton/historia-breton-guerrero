@@ -1,0 +1,320 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getCollection } from 'astro:content';
+import { ADMIN_COOKIE, decodeSession } from '../../lib/admin-auth';
+
+const session = Astro.cookies.get(ADMIN_COOKIE);
+const user    = session ? decodeSession(session.value) : null;
+
+const allPeople  = await getCollection('people');
+const allStories = await getCollection('stories');
+
+const sortedPeople  = allPeople.sort((a, b) => Number(a.data.generation) - Number(b.data.generation));
+const sortedStories = allStories.sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
+
+const branchLabel: Record<string, string> = {
+  breton: 'Bretón', guerrero: 'Guerrero', both: 'Ambas',
+};
+
+const genLabel: Record<string, string> = {
+  '1': 'Bisabuelos', '2': 'Abuelos', '3': 'Padres', '4': 'Hijos', '5': 'Nietos',
+};
+---
+
+<AdminLayout title="Dashboard">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">Bienvenido, {user?.displayName ?? 'editor'}</h1>
+      <p class="dash-subtitle">¿Qué quieres agregar hoy?</p>
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="actions">
+    <a href="/admin/personas/nueva" class="action-card action-card--breton">
+      <span class="action-card__icon">👤</span>
+      <span class="action-card__label">Agregar persona</span>
+    </a>
+    <a href="/admin/historias/nueva" class="action-card action-card--guerrero">
+      <span class="action-card__icon">📖</span>
+      <span class="action-card__label">Agregar historia</span>
+    </a>
+  </div>
+
+  <!-- People list -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title">
+        Personas
+        <span class="section-count">{allPeople.length}</span>
+      </h2>
+      <a href="/admin/personas/nueva" class="btn-sm">+ Nueva</a>
+    </div>
+
+    {allPeople.length === 0 ? (
+      <p class="empty">No hay personas registradas todavía.</p>
+    ) : (
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Familia</th>
+              <th>Generación</th>
+              <th>Nacimiento</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedPeople.map(person => (
+              <tr>
+                <td class="td-name">{person.data.name}</td>
+                <td>
+                  <span class:list={['branch-pill', `branch-pill--${person.data.branch}`]}>
+                    {branchLabel[person.data.branch]}
+                  </span>
+                </td>
+                <td class="td-muted">{genLabel[person.data.generation] ?? person.data.generation}</td>
+                <td class="td-muted">{person.data.born?.slice(0,4) ?? '—'}</td>
+                <td class="td-actions">
+                  <a href={`/admin/personas/${person.id}/editar`} class="link-edit">Editar</a>
+                  <a href={`/people/${person.id}`} class="link-view" target="_blank">Ver ↗</a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
+
+  <!-- Stories list -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title">
+        Historias
+        <span class="section-count">{allStories.length}</span>
+      </h2>
+      <a href="/admin/historias/nueva" class="btn-sm">+ Nueva</a>
+    </div>
+
+    {allStories.length === 0 ? (
+      <p class="empty">No hay historias registradas todavía.</p>
+    ) : (
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Familia</th>
+              <th>Fecha</th>
+              <th>Autor</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedStories.map(story => (
+              <tr>
+                <td class="td-name">{story.data.title}</td>
+                <td>
+                  <span class:list={['branch-pill', `branch-pill--${story.data.branch}`]}>
+                    {branchLabel[story.data.branch]}
+                  </span>
+                </td>
+                <td class="td-muted">{story.data.date?.slice(0,10) ?? '—'}</td>
+                <td class="td-muted">{story.data.author ?? '—'}</td>
+                <td class="td-actions">
+                  <a href={`/admin/historias/${story.id}/editar`} class="link-edit">Editar</a>
+                  <a href={`/stories/${story.id}`} class="link-view" target="_blank">Ver ↗</a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
+</AdminLayout>
+
+<style>
+  .dash-header {
+    margin-bottom: var(--space-8);
+  }
+
+  .dash-title {
+    font-size: 1.75rem;
+    margin-bottom: var(--space-1);
+  }
+
+  .dash-subtitle {
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  /* Quick actions */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    margin-bottom: var(--space-12);
+  }
+
+  .action-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-6);
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+  }
+
+  .action-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+    color: var(--text-primary);
+  }
+
+  .action-card--breton:hover  { border-color: var(--breton); }
+  .action-card--guerrero:hover { border-color: var(--guerrero); }
+
+  .action-card__icon  { font-size: 1.5rem; }
+  .action-card__label { font-size: 1.0625rem; font-weight: 600; }
+
+  /* Sections */
+  .section {
+    margin-bottom: var(--space-12);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+  }
+
+  .section-title {
+    font-size: 1.125rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .section-count {
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 10px;
+  }
+
+  .btn-sm {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--breton);
+    text-decoration: none;
+    border: 1px solid var(--breton-border);
+    border-radius: var(--radius);
+    padding: var(--space-1) var(--space-3);
+    background: var(--breton-light);
+    transition: opacity 0.15s;
+  }
+
+  .btn-sm:hover { opacity: 0.8; color: var(--breton); }
+
+  /* Table */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+  }
+
+  .table thead {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table th {
+    text-align: left;
+    padding: var(--space-3) var(--space-4);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+
+  .table td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table tr:last-child td { border-bottom: none; }
+  .table tr:hover td { background: var(--bg); }
+
+  .td-name   { font-weight: 500; }
+  .td-muted  { color: var(--text-muted); font-size: 0.875rem; }
+
+  .td-actions {
+    display: flex;
+    gap: var(--space-4);
+    justify-content: flex-end;
+  }
+
+  .link-edit {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--breton);
+    text-decoration: none;
+  }
+
+  .link-edit:hover { text-decoration: underline; color: var(--breton); }
+
+  .link-view {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+
+  .link-view:hover { color: var(--text-primary); }
+
+  /* Branch pills */
+  .branch-pill {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+
+  .branch-pill--breton   { background: var(--breton-light);   color: var(--breton); }
+  .branch-pill--guerrero { background: var(--guerrero-light); color: var(--guerrero); }
+  .branch-pill--both     { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+
+  .empty {
+    color: var(--text-muted);
+    font-style: italic;
+    padding: var(--space-8);
+    text-align: center;
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-lg);
+  }
+
+  @media (max-width: 640px) {
+    .actions { grid-template-columns: 1fr; }
+  }
+</style>

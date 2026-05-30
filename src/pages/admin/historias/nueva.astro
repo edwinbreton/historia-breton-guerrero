@@ -1,0 +1,153 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { ADMIN_COOKIE, decodeSession } from '../../../lib/admin-auth';
+import { saveStory } from '../../../lib/content-writer';
+import { getCollection } from 'astro:content';
+
+const session = Astro.cookies.get(ADMIN_COOKIE);
+const user    = session ? decodeSession(session.value) : null;
+
+const allPeople = await getCollection('people');
+const peopleOptions = allPeople
+  .sort((a, b) => a.data.name.localeCompare(b.data.name, 'es'))
+  .map(p => ({ id: p.id, name: p.data.name }));
+
+let errors: string[] = [];
+
+if (Astro.request.method === 'POST') {
+  const contentType = Astro.request.headers.get('content-type') ?? '';
+  let fields: Record<string, string> = {};
+
+  if (contentType.includes('application/x-www-form-urlencoded')) {
+    const body = await Astro.request.text();
+    new URLSearchParams(body).forEach((v, k) => { fields[k] = v; });
+  }
+
+  if (!fields.title)  errors.push('El título es requerido.');
+  if (!fields.branch) errors.push('La familia es requerida.');
+  if (!fields.date)   errors.push('La fecha es requerida.');
+
+  if (errors.length === 0) {
+    const slug = saveStory({
+      ...fields,
+      relatedPeople: fields.relatedPeople ? fields.relatedPeople.split(',').filter(Boolean) : [],
+    }, user?.username ?? 'unknown');
+
+    return Astro.redirect(`/admin/historias/${slug}/editar?saved=1`);
+  }
+}
+
+const today = new Date().toISOString().slice(0, 10);
+---
+
+<AdminLayout title="Nueva historia">
+  <div class="form-page">
+    <div class="form-header">
+      <a href="/admin" class="back-link">← Dashboard</a>
+      <h1>Agregar historia</h1>
+    </div>
+
+    {errors.length > 0 && (
+      <div class="error-banner" role="alert">
+        {errors.map(e => <p>{e}</p>)}
+      </div>
+    )}
+
+    <form method="POST" enctype="application/x-www-form-urlencoded" class="story-form">
+      <div class="form-section">
+        <h2 class="form-section__title">Información básica</h2>
+        <div class="form-grid">
+          <div class="field field--full">
+            <label for="title">Título *</label>
+            <input type="text" id="title" name="title" required placeholder="Ej. La boda de los Guerrero" />
+          </div>
+          <div class="field">
+            <label for="branch">Familia *</label>
+            <select id="branch" name="branch" required>
+              <option value="">— Seleccionar —</option>
+              <option value="breton">Bretón</option>
+              <option value="guerrero">Guerrero</option>
+              <option value="both">Ambas familias</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="date">Fecha *</label>
+            <input type="date" id="date" name="date" required value={today} />
+          </div>
+          <div class="field">
+            <label for="author">Autor</label>
+            <input type="text" id="author" name="author" value={user?.displayName ?? ''} />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2 class="form-section__title">Personas relacionadas</h2>
+        <p class="form-section__hint">Selecciona con Ctrl+clic (o Cmd+clic en Mac) para elegir varias personas.</p>
+        <div class="field">
+          <select id="relatedPeople-select" multiple class="multi-select">
+            {peopleOptions.map(p => <option value={p.id}>{p.name}</option>)}
+          </select>
+          <input type="hidden" id="relatedPeople" name="relatedPeople" />
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2 class="form-section__title">Contenido</h2>
+        <div class="field field--full">
+          <textarea id="body" name="body" rows="16" placeholder="Escribe aquí la historia..."></textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <a href="/admin" class="btn-cancel">Cancelar</a>
+        <button type="submit" class="btn-save">Guardar historia</button>
+      </div>
+    </form>
+  </div>
+</AdminLayout>
+
+<script>
+  const sel    = document.getElementById('relatedPeople-select') as HTMLSelectElement;
+  const hidden = document.getElementById('relatedPeople') as HTMLInputElement;
+  sel.addEventListener('change', () => {
+    hidden.value = Array.from(sel.selectedOptions).map(o => o.value).join(',');
+  });
+</script>
+
+<style>
+  .form-page { max-width: 760px; }
+  .form-header { margin-bottom: var(--space-8); }
+  .back-link { font-size: 0.875rem; color: var(--text-muted); text-decoration: none; display: inline-block; margin-bottom: var(--space-3); }
+  .back-link:hover { color: var(--text-primary); }
+  .form-header h1 { font-size: 1.75rem; }
+
+  .error-banner { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius); padding: var(--space-4); margin-bottom: var(--space-6); color: #b91c1c; font-size: 0.9375rem; }
+  .error-banner p { margin: 0; }
+
+  .form-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); margin-bottom: var(--space-6); }
+  .form-section__title { font-size: 1rem; margin-bottom: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }
+  .form-section__hint { font-size: 0.875rem; color: var(--text-muted); margin-bottom: var(--space-4); }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .field { display: flex; flex-direction: column; gap: var(--space-2); }
+  .field--full { grid-column: 1 / -1; }
+  .field label { font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); }
+
+  .field input, .field select, .field textarea {
+    padding: var(--space-3) var(--space-4); font-size: 0.9375rem; font-family: var(--font-sans);
+    border: 1.5px solid var(--border); border-radius: var(--radius); background: var(--bg);
+    color: var(--text-primary); transition: border-color 0.15s; width: 100%;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--breton); }
+  .field textarea { resize: vertical; line-height: 1.6; }
+  .multi-select { min-height: 140px; }
+
+  .form-actions { display: flex; justify-content: flex-end; gap: var(--space-4); padding-top: var(--space-4); }
+  .btn-cancel { padding: var(--space-3) var(--space-6); font-size: 0.9375rem; color: var(--text-secondary); text-decoration: none; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+  .btn-cancel:hover { background: var(--bg); color: var(--text-primary); }
+  .btn-save { padding: var(--space-3) var(--space-8); font-size: 0.9375rem; font-weight: 600; font-family: var(--font-sans); color: white; background: var(--guerrero); border: none; border-radius: var(--radius); cursor: pointer; transition: opacity 0.15s; }
+  .btn-save:hover { opacity: 0.85; }
+
+  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } .field--full { grid-column: 1; } }
+</style>
