@@ -77,7 +77,7 @@ async function githubWrite(path: string, content: string, message: string): Prom
 
   const body: Record<string, any> = {
     message,
-    content: btoa(unescape(encodeURIComponent(content))),
+    content: Buffer.from(content, 'utf-8').toString('base64'),
     branch:  BRANCH,
   };
   if (sha) body.sha = sha;
@@ -155,22 +155,33 @@ function localDelete(filePath: string, message: string): void {
 // ── File upload ───────────────────────────────────────────────────────────────
 
 export async function saveUploadedFile(file: File, folder: string): Promise<string> {
-  const { extname } = require('node:path');
-  const ext      = extname(file.name) || '.jpg';
+  const ext      = (file.name.match(/\.[^.]+$/) ?? ['.jpg'])[0];
   const slug     = slugify(file.name.replace(/\.[^.]+$/, ''));
   const filename = `${slug}-${Date.now()}${ext}`;
   const repoPath = `public/uploads/${folder}/${filename}`;
   const buffer   = Buffer.from(await file.arrayBuffer());
 
   if (GITHUB_TOKEN) {
-    // Upload via GitHub API
-    await githubWrite(
-      repoPath,
-      buffer.toString('base64'),
-      `[upload] ${filename}`
-    );
+    // Binary files must be sent as raw base64 — use buffer directly
+    const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${repoPath}`;
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Authorization:  `Bearer ${GITHUB_TOKEN}`,
+        Accept:         'application/vnd.github+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: `[upload] ${filename}`,
+        content: buffer.toString('base64'),
+        branch:  BRANCH,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`GitHub upload error: ${res.status} ${err}`);
+    }
   } else {
-    // Local: write directly
     const { join } = require('node:path');
     const { writeFileSync, mkdirSync } = require('node:fs');
     const dir = join(REPO_ROOT, 'public', 'uploads', folder);
