@@ -1,12 +1,14 @@
+import { writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { join, dirname, extname } from 'node:path';
 
-const REPO_ROOT  = process.cwd();
+const REPO_ROOT    = process.cwd();
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const REPO_OWNER   = 'edwinbreton';
 const REPO_NAME    = 'historia-breton-guerrero';
 const BRANCH       = 'main';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function slugify(text: string): string {
   return text
@@ -19,10 +21,8 @@ function slugify(text: string): string {
 
 function toFrontmatter(data: Record<string, any>): string {
   const lines: string[] = ['---'];
-
   for (const [key, value] of Object.entries(data)) {
     if (value === null || value === undefined || value === '') continue;
-
     if (Array.isArray(value)) {
       if (value.length === 0) continue;
       lines.push(`${key}:`);
@@ -40,21 +40,8 @@ function toFrontmatter(data: Record<string, any>): string {
       lines.push(`${key}: ${JSON.stringify(value)}`);
     }
   }
-
   lines.push('---');
   return lines.join('\n');
-}
-
-const isNetlify = !!process.env.NETLIFY || !!GITHUB_TOKEN && !isLocal();
-
-function isLocal(): boolean {
-  try {
-    const { writeFileSync } = require('node:fs');
-    writeFileSync('/tmp/bg-test', '');
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 // ── GitHub API ────────────────────────────────────────────────────────────────
@@ -62,7 +49,6 @@ function isLocal(): boolean {
 async function githubWrite(path: string, content: string, message: string): Promise<void> {
   const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`;
 
-  // Get existing file SHA if it exists (needed for updates)
   let sha: string | undefined;
   const getRes = await fetch(url, {
     headers: {
@@ -78,15 +64,15 @@ async function githubWrite(path: string, content: string, message: string): Prom
   const body: Record<string, any> = {
     message,
     content: Buffer.from(content, 'utf-8').toString('base64'),
-    branch:  BRANCH,
+    branch: BRANCH,
   };
   if (sha) body.sha = sha;
 
   const res = await fetch(url, {
-    method:  'PUT',
+    method: 'PUT',
     headers: {
-      Authorization:  `Bearer ${GITHUB_TOKEN}`,
-      Accept:         'application/vnd.github+json',
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -94,7 +80,45 @@ async function githubWrite(path: string, content: string, message: string): Prom
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`GitHub API error: ${res.status} ${err}`);
+    throw new Error(`GitHub API error ${res.status}: ${err}`);
+  }
+}
+
+async function githubWriteBinary(path: string, buffer: Buffer, message: string): Promise<void> {
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`;
+
+  let sha: string | undefined;
+  const getRes = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+    },
+  });
+  if (getRes.ok) {
+    const existing = await getRes.json() as { sha: string };
+    sha = existing.sha;
+  }
+
+  const body: Record<string, any> = {
+    message,
+    content: buffer.toString('base64'),
+    branch: BRANCH,
+  };
+  if (sha) body.sha = sha;
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`GitHub API upload error ${res.status}: ${err}`);
   }
 }
 
@@ -107,16 +131,15 @@ async function githubDelete(path: string, message: string): Promise<void> {
       Accept: 'application/vnd.github+json',
     },
   });
-
-  if (!getRes.ok) return; // already gone
+  if (!getRes.ok) return;
 
   const existing = await getRes.json() as { sha: string };
 
   const res = await fetch(url, {
-    method:  'DELETE',
+    method: 'DELETE',
     headers: {
-      Authorization:  `Bearer ${GITHUB_TOKEN}`,
-      Accept:         'application/vnd.github+json',
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ message, sha: existing.sha, branch: BRANCH }),
@@ -124,15 +147,13 @@ async function githubDelete(path: string, message: string): Promise<void> {
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`GitHub API delete error: ${res.status} ${err}`);
+    throw new Error(`GitHub API delete error ${res.status}: ${err}`);
   }
 }
 
 // ── Local filesystem ──────────────────────────────────────────────────────────
 
 function localWrite(filePath: string, content: string, message: string): void {
-  const { writeFileSync, mkdirSync } = require('node:fs');
-  const { dirname } = require('node:path');
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, content, 'utf-8');
   try {
@@ -144,7 +165,6 @@ function localWrite(filePath: string, content: string, message: string): void {
 }
 
 function localDelete(filePath: string, message: string): void {
-  const { unlinkSync } = require('node:fs');
   try { unlinkSync(filePath); } catch {}
   try {
     execSync(`git rm "${filePath}"`, { cwd: REPO_ROOT });
@@ -162,28 +182,8 @@ export async function saveUploadedFile(file: File, folder: string): Promise<stri
   const buffer   = Buffer.from(await file.arrayBuffer());
 
   if (GITHUB_TOKEN) {
-    // Binary files must be sent as raw base64 — use buffer directly
-    const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${repoPath}`;
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        Authorization:  `Bearer ${GITHUB_TOKEN}`,
-        Accept:         'application/vnd.github+json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: `[upload] ${filename}`,
-        content: buffer.toString('base64'),
-        branch:  BRANCH,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`GitHub upload error: ${res.status} ${err}`);
-    }
+    await githubWriteBinary(repoPath, buffer, `[upload] ${filename}`);
   } else {
-    const { join } = require('node:path');
-    const { writeFileSync, mkdirSync } = require('node:fs');
     const dir = join(REPO_ROOT, 'public', 'uploads', folder);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, filename), buffer);
@@ -219,7 +219,6 @@ export async function savePerson(data: Record<string, any>, editor: string): Pro
   if (GITHUB_TOKEN) {
     await githubWrite(repoPath, content, message);
   } else {
-    const { join } = require('node:path');
     localWrite(join(REPO_ROOT, repoPath), content, message);
   }
 
@@ -233,7 +232,6 @@ export async function deletePerson(slug: string, editor: string): Promise<void> 
   if (GITHUB_TOKEN) {
     await githubDelete(repoPath, message);
   } else {
-    const { join } = require('node:path');
     localDelete(join(REPO_ROOT, repoPath), message);
   }
 }
@@ -259,7 +257,6 @@ export async function saveStory(data: Record<string, any>, editor: string): Prom
   if (GITHUB_TOKEN) {
     await githubWrite(repoPath, content, message);
   } else {
-    const { join } = require('node:path');
     localWrite(join(REPO_ROOT, repoPath), content, message);
   }
 
@@ -273,7 +270,6 @@ export async function deleteStory(slug: string, editor: string): Promise<void> {
   if (GITHUB_TOKEN) {
     await githubDelete(repoPath, message);
   } else {
-    const { join } = require('node:path');
     localDelete(join(REPO_ROOT, repoPath), message);
   }
 }
