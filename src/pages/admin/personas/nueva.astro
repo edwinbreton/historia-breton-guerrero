@@ -68,6 +68,14 @@ if (Astro.request.method === 'POST') {
             <input type="text" id="name" name="name" required placeholder="Ej. María Guerrero López" />
           </div>
           <div class="field">
+            <label for="gender">Género *</label>
+            <select id="gender" name="gender" required>
+              <option value="">— Seleccionar —</option>
+              <option value="M">Masculino</option>
+              <option value="F">Femenino</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="branch">Familia *</label>
             <select id="branch" name="branch" required>
               <option value="">— Seleccionar —</option>

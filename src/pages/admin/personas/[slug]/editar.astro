@@ -108,6 +108,14 @@ const { Content } = await render(person);
             <input type="text" id="name" name="name" required value={current.name} />
           </div>
           <div class="field">
+            <label for="gender">Género *</label>
+            <select id="gender" name="gender" required>
+              <option value="">— Seleccionar —</option>
+              <option value="M" selected={d.gender === 'M'}>Masculino</option>
+              <option value="F" selected={d.gender === 'F'}>Femenino</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="branch">Familia *</label>
             <select id="branch" name="branch" required>
               <option value="">— Seleccionar —</option>

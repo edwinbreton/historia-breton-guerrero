@@ -294,6 +294,7 @@ export async function savePerson(data: Record<string, any>, editor: string): Pro
   const slug = data.existingSlug || slugify(data.name);
   const frontmatter = toFrontmatter({
     name:       data.name,
+    gender:     data.gender     || null,
     branch:     data.branch,
     born:       data.born       || null,
     deceased:   data.deceased   || null,

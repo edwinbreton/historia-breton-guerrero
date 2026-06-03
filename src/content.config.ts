@@ -5,6 +5,7 @@ const people = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/people' }),
   schema: z.object({
     name:       z.string(),
+    gender:     z.enum(['M', 'F']).optional(),
     branch:     z.enum(['breton', 'guerrero', 'both']),
     born:       z.string().optional(),
     deceased:   z.boolean().optional(),

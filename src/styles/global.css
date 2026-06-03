@@ -174,3 +174,48 @@ img {
     padding-inline: var(--space-4);
   }
 }
+
+/* ── Family Chart theme overrides ───────────────────────────────────────────── */
+.f3 {
+  --female-color:     #F5F1EB;
+  --male-color:       #E8F0EF;
+  --genderless-color: #F0ECF2;
+  --background-color: #F7F6F3;
+  --text-color:       #2A2A24;
+  font-family: 'Inter', sans-serif;
+}
+
+.f3.f3-cont {
+  background-color: #F7F6F3 !important;
+  color: #2A2A24 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+}
+
+.f3 rect.card-female,
+.f3 .card-female .card-body-rect,
+.f3 .card-female .text-overflow-mask { fill: #F5F1EB !important; }
+
+.f3 rect.card-male,
+.f3 .card-male .card-body-rect,
+.f3 .card-male .text-overflow-mask { fill: #E8F0EF !important; }
+
+.f3 .card-genderless .card-body-rect,
+.f3 .card-genderless .text-overflow-mask { fill: #F0ECF2 !important; }
+
+.f3 svg.main_svg text { fill: #2A2A24 !important; }
+.f3 .card-main-outline { stroke: #C0BDB5 !important; stroke-width: 1.5px !important; }
+.f3 path.link_path { stroke: #C0BDB5 !important; fill: none !important; }
+.f3 .card_add_relative { display: none !important; }
+.f3 .card_edit { display: none !important; }
+
+/* Family Chart HTML card theming — classes confirmed from DOM inspection */
+.f3 .card { color: #2A2A24 !important; }
+.f3 .card.card-male   { background-color: #E8F0EF !important; }
+.f3 .card.card-female { background-color: #F5F1EB !important; }
+.f3 .card-image-rect  { border-radius: 8px !important; box-shadow: 0 1px 6px rgba(0,0,0,0.08) !important; }
+.f3 .card-label       { color: #2A2A24 !important; font-size: 0.8rem !important; }
+.f3 .person-icon      { opacity: 0.15 !important; } /* dim placeholder icon */
+.f3 .card-image-rect img { border-radius: 50%; object-fit: cover; }
+.f3 .f3-nav-cont      { display: none !important; } /* hide nav buttons */

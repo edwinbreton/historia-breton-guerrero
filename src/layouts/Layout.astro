@@ -5,9 +5,10 @@ import '../styles/global.css';
 interface Props {
   title: string;
   description?: string;
+  extraHead?: string;
 }
 
-const { title, description = 'La historia de las familias Bretón y Guerrero.' } = Astro.props;
+const { title, description = 'La historia de las familias Bretón y Guerrero.', extraHead } = Astro.props;
 ---
 
 <!doctype html>
@@ -19,6 +20,7 @@ const { title, description = 'La historia de las familias Bretón y Guerrero.' }
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="generator" content={Astro.generator} />
+    <slot name="head" />
     <title>{title} — Bretón &amp; Guerrero</title>
   </head>
   <body>
