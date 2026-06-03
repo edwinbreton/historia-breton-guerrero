@@ -106,7 +106,14 @@ if (!nodes.length) {
   svg.style('display', 'none');
 } else {
   empty.style.display = 'none';
-  buildTree();
+  try {
+    buildTree();
+  } catch (e) {
+    console.error('Tree render error:', e);
+    empty.style.display = 'flex';
+    empty.querySelector('p')!.textContent = `Error al renderizar el árbol: ${e}`;
+    svg.style('display', 'none');
+  }
 }
 
 function buildTree() {
