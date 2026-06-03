@@ -8,6 +8,12 @@ const REPO_OWNER   = 'edwinbreton';
 const REPO_NAME    = 'historia-breton-guerrero';
 const BRANCH       = 'main';
 
+// Draft paths (staged but not yet published)
+const DRAFT_PEOPLE_PATH  = 'drafts/people';
+const DRAFT_STORIES_PATH = 'drafts/stories';
+const LIVE_PEOPLE_PATH   = 'src/content/people';
+const LIVE_STORIES_PATH  = 'src/content/stories';
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function slugify(text: string): string {
@@ -192,6 +198,96 @@ export async function saveUploadedFile(file: File, folder: string): Promise<stri
   return `/uploads/${folder}/${filename}`;
 }
 
+// ── Draft listing ─────────────────────────────────────────────────────────────
+
+export interface DraftEntry {
+  slug: string;
+  type: 'person' | 'story';
+  path: string;
+}
+
+export async function listDrafts(): Promise<DraftEntry[]> {
+  const drafts: DraftEntry[] = [];
+
+  if (GITHUB_TOKEN) {
+    for (const [type, draftPath] of [['person', DRAFT_PEOPLE_PATH], ['story', DRAFT_STORIES_PATH]] as const) {
+      const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${draftPath}`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
+      });
+      if (!res.ok) continue;
+      const files = await res.json() as Array<{ name: string; path: string }>;
+      for (const file of files) {
+        if (file.name.endsWith('.md')) {
+          drafts.push({ slug: file.name.replace('.md', ''), type, path: file.path });
+        }
+      }
+    }
+  } else {
+    // Local — read from filesystem
+    const { readdirSync, existsSync } = await import('node:fs');
+    for (const [type, draftPath] of [['person', DRAFT_PEOPLE_PATH], ['story', DRAFT_STORIES_PATH]] as const) {
+      const dir = join(REPO_ROOT, draftPath);
+      if (!existsSync(dir)) continue;
+      for (const file of readdirSync(dir)) {
+        if (file.endsWith('.md')) {
+          drafts.push({ slug: file.replace('.md', ''), type, path: `${draftPath}/${file}` });
+        }
+      }
+    }
+  }
+
+  return drafts;
+}
+
+// ── Publish all drafts ────────────────────────────────────────────────────────
+
+export async function publishDrafts(editor: string): Promise<number> {
+  const drafts = await listDrafts();
+  if (drafts.length === 0) return 0;
+
+  if (GITHUB_TOKEN) {
+    // Fetch each draft's content and write to live path via GitHub API
+    for (const draft of drafts) {
+      const livePath = draft.type === 'person'
+        ? `${LIVE_PEOPLE_PATH}/${draft.slug}.md`
+        : `${LIVE_STORIES_PATH}/${draft.slug}.md`;
+
+      // Get draft content
+      const getUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${draft.path}`;
+      const getRes = await fetch(getUrl, {
+        headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
+      });
+      if (!getRes.ok) continue;
+      const fileData = await getRes.json() as { content: string; sha: string };
+      const content  = Buffer.from(fileData.content, 'base64').toString('utf-8');
+
+      // Write to live path
+      await githubWrite(livePath, content, `[${editor}] Publicó ${draft.type === 'person' ? 'persona' : 'historia'}: ${draft.slug}`);
+
+      // Delete draft
+      await githubDelete(draft.path, `[${editor}] Eliminó borrador: ${draft.slug}`);
+    }
+  } else {
+    // Local — move files
+    const { readFileSync, renameSync, mkdirSync } = await import('node:fs');
+    for (const draft of drafts) {
+      const srcPath  = join(REPO_ROOT, draft.path);
+      const livePath = draft.type === 'person'
+        ? join(REPO_ROOT, LIVE_PEOPLE_PATH, `${draft.slug}.md`)
+        : join(REPO_ROOT, LIVE_STORIES_PATH, `${draft.slug}.md`);
+      mkdirSync(dirname(livePath), { recursive: true });
+      renameSync(srcPath, livePath);
+    }
+    try {
+      execSync(`git add -A`, { cwd: REPO_ROOT });
+      execSync(`git commit -m "[${editor}] Publicó ${drafts.length} cambio(s)"`, { cwd: REPO_ROOT });
+    } catch {}
+  }
+
+  return drafts.length;
+}
+
 // ── Person ────────────────────────────────────────────────────────────────────
 
 export async function savePerson(data: Record<string, any>, editor: string): Promise<string> {
@@ -211,28 +307,44 @@ export async function savePerson(data: Record<string, any>, editor: string): Pro
     spouses:    data.spouses    || [],
   });
 
-  const body    = data.bio ? `\n${data.bio}\n` : '';
-  const content = `${frontmatter}\n${body}`;
-  const repoPath = `src/content/people/${slug}.md`;
-  const message  = `[${editor}] Guardó persona: ${data.name}`;
+  const body      = data.bio ? `\n${data.bio}\n` : '';
+  const content   = `${frontmatter}\n${body}`;
+  const draftPath = `${DRAFT_PEOPLE_PATH}/${slug}.md`;
+  const message   = `[${editor}] Guardó borrador de persona: ${data.name}`;
 
   if (GITHUB_TOKEN) {
-    await githubWrite(repoPath, content, message);
+    await githubWrite(draftPath, content, message);
   } else {
-    localWrite(join(REPO_ROOT, repoPath), content, message);
+    localWrite(join(REPO_ROOT, draftPath), content, message);
   }
 
   return slug;
 }
 
 export async function deletePerson(slug: string, editor: string): Promise<void> {
-  const repoPath = `src/content/people/${slug}.md`;
-  const message  = `[${editor}] Eliminó persona: ${slug}`;
+  // Try to delete from drafts first, then from live
+  const draftPath = `${DRAFT_PEOPLE_PATH}/${slug}.md`;
+  const livePath  = `${LIVE_PEOPLE_PATH}/${slug}.md`;
+  const message   = `[${editor}] Eliminó persona: ${slug}`;
 
   if (GITHUB_TOKEN) {
-    await githubDelete(repoPath, message);
+    // Try draft first
+    const draftRes = await fetch(
+      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${draftPath}`,
+      { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' } }
+    );
+    if (draftRes.ok) {
+      await githubDelete(draftPath, message);
+    } else {
+      await githubDelete(livePath, message);
+    }
   } else {
-    localDelete(join(REPO_ROOT, repoPath), message);
+    const { existsSync } = await import('node:fs');
+    if (existsSync(join(REPO_ROOT, draftPath))) {
+      localDelete(join(REPO_ROOT, draftPath), message);
+    } else {
+      localDelete(join(REPO_ROOT, livePath), message);
+    }
   }
 }
 
@@ -249,27 +361,41 @@ export async function saveStory(data: Record<string, any>, editor: string): Prom
     relatedPeople: data.relatedPeople || [],
   });
 
-  const body    = data.body ? `\n${data.body}\n` : '';
-  const content = `${frontmatter}\n${body}`;
-  const repoPath = `src/content/stories/${slug}.md`;
-  const message  = `[${editor}] Guardó historia: ${data.title}`;
+  const body      = data.body ? `\n${data.body}\n` : '';
+  const content   = `${frontmatter}\n${body}`;
+  const draftPath = `${DRAFT_STORIES_PATH}/${slug}.md`;
+  const message   = `[${editor}] Guardó borrador de historia: ${data.title}`;
 
   if (GITHUB_TOKEN) {
-    await githubWrite(repoPath, content, message);
+    await githubWrite(draftPath, content, message);
   } else {
-    localWrite(join(REPO_ROOT, repoPath), content, message);
+    localWrite(join(REPO_ROOT, draftPath), content, message);
   }
 
   return slug;
 }
 
 export async function deleteStory(slug: string, editor: string): Promise<void> {
-  const repoPath = `src/content/stories/${slug}.md`;
-  const message  = `[${editor}] Eliminó historia: ${slug}`;
+  const draftPath = `${DRAFT_STORIES_PATH}/${slug}.md`;
+  const livePath  = `${LIVE_STORIES_PATH}/${slug}.md`;
+  const message   = `[${editor}] Eliminó historia: ${slug}`;
 
   if (GITHUB_TOKEN) {
-    await githubDelete(repoPath, message);
+    const draftRes = await fetch(
+      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${draftPath}`,
+      { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' } }
+    );
+    if (draftRes.ok) {
+      await githubDelete(draftPath, message);
+    } else {
+      await githubDelete(livePath, message);
+    }
   } else {
-    localDelete(join(REPO_ROOT, repoPath), message);
+    const { existsSync } = await import('node:fs');
+    if (existsSync(join(REPO_ROOT, draftPath))) {
+      localDelete(join(REPO_ROOT, draftPath), message);
+    } else {
+      localDelete(join(REPO_ROOT, livePath), message);
+    }
   }
 }

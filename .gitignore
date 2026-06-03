@@ -33,5 +33,9 @@ tina/__generated__
 src/content/people/*.md
 src/content/stories/*.md
 
+# Local drafts
+drafts/people/*.md
+drafts/stories/*.md
+
 # Uploaded media (local only)
 public/uploads/

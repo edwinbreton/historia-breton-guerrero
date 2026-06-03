@@ -2,6 +2,7 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getCollection } from 'astro:content';
 import { ADMIN_COOKIE, decodeSession } from '../../lib/admin-auth';
+import { listDrafts } from '../../lib/content-writer';
 
 const session = Astro.cookies.get(ADMIN_COOKIE);
 const user    = session ? decodeSession(session.value) : null;
@@ -16,6 +17,11 @@ const branchLabel: Record<string, string> = {
   breton: 'Bretón', guerrero: 'Guerrero', both: 'Ambas',
 };
 
+const drafts       = await listDrafts();
+const draftCount   = drafts.length;
+const justPublished = Astro.url.searchParams.get('published');
+const publishError  = Astro.url.searchParams.get('publishError');
+
 const genLabel: Record<string, string> = {
   '1': 'Bisabuelos', '2': 'Abuelos', '3': 'Padres', '4': 'Hijos', '5': 'Nietos',
 };
@@ -28,6 +34,44 @@ const genLabel: Record<string, string> = {
       <p class="dash-subtitle">¿Qué quieres agregar hoy?</p>
     </div>
   </div>
+
+  {justPublished && (
+    <div class="banner banner--success">
+      ✓ Se publicaron {justPublished} cambio(s) correctamente. El sitio se está actualizando.
+    </div>
+  )}
+
+  {publishError && (
+    <div class="banner banner--error">
+      Error al publicar: {publishError}
+    </div>
+  )}
+
+  {draftCount > 0 && (
+    <div class="draft-banner">
+      <div class="draft-banner__info">
+        <span class="draft-banner__count">{draftCount}</span>
+        <span class="draft-banner__label">
+          {draftCount === 1 ? 'cambio pendiente de publicación' : 'cambios pendientes de publicación'}
+        </span>
+        <ul class="draft-banner__list">
+          {drafts.map(d => (
+            <li>
+              <span class:list={['draft-type', `draft-type--${d.type}`]}>
+                {d.type === 'person' ? 'Persona' : 'Historia'}
+              </span>
+              {d.slug}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <form method="POST" action="/admin/publicar">
+        <button type="submit" class="btn-publish">
+          Publicar cambios
+        </button>
+      </form>
+    </div>
+  )}
 
   <!-- Quick actions -->
   <div class="actions">
@@ -137,6 +181,103 @@ const genLabel: Record<string, string> = {
 </AdminLayout>
 
 <style>
+  .banner {
+    padding: var(--space-4);
+    border-radius: var(--radius);
+    margin-bottom: var(--space-6);
+    font-size: 0.9375rem;
+  }
+
+  .banner--success {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    color: #15803d;
+  }
+
+  .banner--error {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #b91c1c;
+  }
+
+  /* Draft banner */
+  .draft-banner {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-6);
+    background: #fffbeb;
+    border: 1.5px solid #fcd34d;
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-6);
+    margin-bottom: var(--space-8);
+  }
+
+  .draft-banner__info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .draft-banner__count {
+    font-family: var(--font-serif);
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: #92400e;
+    line-height: 1;
+  }
+
+  .draft-banner__label {
+    font-size: 0.9375rem;
+    color: #92400e;
+    font-weight: 500;
+  }
+
+  .draft-banner__list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+  }
+
+  .draft-banner__list li {
+    font-size: 0.8125rem;
+    color: #92400e;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .draft-type {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 1px 6px;
+    border-radius: 999px;
+  }
+
+  .draft-type--person  { background: var(--breton-light);   color: var(--breton); }
+  .draft-type--story   { background: var(--guerrero-light); color: var(--guerrero); }
+
+  .btn-publish {
+    padding: var(--space-3) var(--space-6);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    color: white;
+    background: #d97706;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+
+  .btn-publish:hover { opacity: 0.85; }
+
   .dash-header {
     margin-bottom: var(--space-8);
   }
