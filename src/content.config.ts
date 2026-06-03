@@ -6,7 +6,6 @@ const people = defineCollection({
   schema: z.object({
     name:       z.string(),
     branch:     z.enum(['breton', 'guerrero', 'both']),
-    generation: z.string(),
     born:       z.string().optional(),
     deceased:   z.boolean().optional(),
     died:       z.string().optional(),

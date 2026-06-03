@@ -10,7 +10,7 @@ const user    = session ? decodeSession(session.value) : null;
 const allPeople  = await getCollection('people');
 const allStories = await getCollection('stories');
 
-const sortedPeople  = allPeople.sort((a, b) => Number(a.data.generation) - Number(b.data.generation));
+const sortedPeople  = allPeople.sort((a, b) => a.data.name.localeCompare(b.data.name, 'es'));
 const sortedStories = allStories.sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
 
 const branchLabel: Record<string, string> = {
@@ -22,9 +22,6 @@ const draftCount   = drafts.length;
 const justPublished = Astro.url.searchParams.get('published');
 const publishError  = Astro.url.searchParams.get('publishError');
 
-const genLabel: Record<string, string> = {
-  '1': 'Bisabuelos', '2': 'Abuelos', '3': 'Padres', '4': 'Hijos', '5': 'Nietos',
-};
 ---
 
 <AdminLayout title="Dashboard">
@@ -104,7 +101,6 @@ const genLabel: Record<string, string> = {
             <tr>
               <th>Nombre</th>
               <th>Familia</th>
-              <th>Generación</th>
               <th>Nacimiento</th>
               <th></th>
             </tr>
@@ -118,7 +114,6 @@ const genLabel: Record<string, string> = {
                     {branchLabel[person.data.branch]}
                   </span>
                 </td>
-                <td class="td-muted">{genLabel[person.data.generation] ?? person.data.generation}</td>
                 <td class="td-muted">{person.data.born?.slice(0,4) ?? '—'}</td>
                 <td class="td-actions">
                   <a href={`/admin/personas/${person.id}/editar`} class="link-edit">Editar</a>

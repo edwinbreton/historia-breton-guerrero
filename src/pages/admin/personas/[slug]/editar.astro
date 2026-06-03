@@ -35,7 +35,6 @@ if (Astro.request.method === 'POST') {
 
   if (!fields.name) errors.push('El nombre es requerido.');
   if (!fields.branch) errors.push('La familia es requerida.');
-  if (!fields.generation) errors.push('La generación es requerida.');
 
   if (errors.length === 0) {
     try {
@@ -67,7 +66,6 @@ if (Astro.request.method === 'POST') {
 const current = {
   name:       d.name ?? '',
   branch:     d.branch ?? '',
-  generation: d.generation ?? '',
   born:       d.born ?? '',
   deceased:   d.deceased ?? !!d.died,
   died:       d.died ?? '',
@@ -116,17 +114,6 @@ const { Content } = await render(person);
               <option value="breton"   selected={current.branch === 'breton'}>Bretón</option>
               <option value="guerrero" selected={current.branch === 'guerrero'}>Guerrero</option>
               <option value="both"     selected={current.branch === 'both'}>Ambas familias</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="generation">Generación *</label>
-            <select id="generation" name="generation" required>
-              <option value="">— Seleccionar —</option>
-              <option value="1" selected={current.generation === '1'}>Bisabuelos</option>
-              <option value="2" selected={current.generation === '2'}>Abuelos</option>
-              <option value="3" selected={current.generation === '3'}>Padres</option>
-              <option value="4" selected={current.generation === '4'}>Hijos</option>
-              <option value="5" selected={current.generation === '5'}>Nietos</option>
             </select>
           </div>
           <div class="field">

@@ -30,14 +30,6 @@ function formatDate(str?: string) {
   return d.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 }
 
-const generationLabels: Record<string, string> = {
-  '1': 'Bisabuelos',
-  '2': 'Abuelos',
-  '3': 'Padres',
-  '4': 'Hijos',
-  '5': 'Nietos',
-};
-const generationLabel = generationLabels[data.generation] ?? `Generación ${data.generation}`;
 ---
 
 <Layout title={data.name} description={`Perfil de ${data.name} — ${branchLabel}`}>
@@ -71,7 +63,6 @@ const generationLabel = generationLabels[data.generation] ?? `Generación ${data
           {data.died && <span>{formatDate(data.died)}</span>}
         </p>
         {data.birthplace && <p class="profile-hero__place">📍 {data.birthplace}</p>}
-        <span class="profile-hero__generation">{generationLabel}</span>
       </div>
     </div>
 

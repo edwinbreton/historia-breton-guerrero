@@ -5,11 +5,11 @@ import { getCollection } from 'astro:content';
 const allPeople = await getCollection('people');
 
 // Serialize only what D3 needs
-const nodes = allPeople.map(p => ({
+// Build raw node list
+const rawNodes = allPeople.map(p => ({
   slug:       p.id,
   name:       p.data.name,
   branch:     p.data.branch,
-  generation: Number(p.data.generation),
   born:       p.data.born  ?? null,
   died:       p.data.died  ?? null,
   birthplace: p.data.birthplace ?? null,
@@ -19,6 +19,45 @@ const nodes = allPeople.map(p => ({
   children:   p.data.children ?? [],
   spouses:    p.data.spouses  ?? [],
 }));
+
+// Calculate generation from relationships (BFS from roots)
+function calcGenerations(nodes: typeof rawNodes): Map<string, number> {
+  const genMap = new Map<string, number>();
+  const bySlug = new Map(nodes.map(n => [n.slug, n]));
+
+  // Roots = people with no parents listed (or parents not in tree)
+  const roots = nodes.filter(n =>
+    n.parents.length === 0 || n.parents.every(p => !bySlug.has(p))
+  );
+
+  const queue: Array<{ slug: string; gen: number }> = roots.map(r => ({ slug: r.slug, gen: 1 }));
+
+  while (queue.length > 0) {
+    const { slug, gen } = queue.shift()!;
+    if (genMap.has(slug)) continue;
+    genMap.set(slug, gen);
+    const node = bySlug.get(slug);
+    if (!node) continue;
+    for (const childSlug of node.children) {
+      if (!genMap.has(childSlug)) {
+        queue.push({ slug: childSlug, gen: gen + 1 });
+      }
+    }
+  }
+
+  return genMap;
+}
+
+const genMap = calcGenerations(rawNodes);
+
+// Only include people who have at least one relationship OR are roots
+const nodes = rawNodes
+  .filter(n => {
+    const hasRelationship = n.parents.length > 0 || n.children.length > 0 || n.spouses.length > 0;
+    const isRoot = n.parents.length === 0 && genMap.has(n.slug);
+    return hasRelationship || isRoot;
+  })
+  .map(n => ({ ...n, generation: genMap.get(n.slug) ?? 1 }));
 ---
 
 <Layout title="Árbol familiar">
@@ -90,7 +129,6 @@ const COLORS = {
   border:  '#E8E6E1',
 };
 
-const GEN_LABELS = { 1: 'Bisabuelos', 2: 'Abuelos', 3: 'Padres', 4: 'Hijos', 5: 'Nietos' };
 
 // ── Setup ────────────────────────────────────────────────────────────────────
 const wrap    = document.getElementById('canvas-wrap');
@@ -164,23 +202,6 @@ function buildTree() {
   const initialTransform = d3.zoomIdentity.translate(tx, ty).scale(scale);
   svg.call(zoom.transform, initialTransform);
 
-  // ── Generation labels ────────────────────────────────────────────────────
-  const labelLayer = g.append('g').attr('class', 'gen-labels');
-  generations.forEach(gen => {
-    const members = genMap.get(gen);
-    if (!members.length) return;
-    const y = (gen - 1) * GEN_GAP + NODE_H / 2;
-    labelLayer.append('text')
-      .attr('x', minX - 8)
-      .attr('y', y)
-      .attr('text-anchor', 'end')
-      .attr('dominant-baseline', 'middle')
-      .attr('font-size', 11)
-      .attr('font-family', 'Inter, sans-serif')
-      .attr('fill', COLORS.muted)
-      .attr('letter-spacing', '0.06em')
-      .text((GEN_LABELS[gen] ?? `Gen. ${gen}`).toUpperCase());
-  });
 
   // ── Links ────────────────────────────────────────────────────────────────
   const linkLayer = g.append('g').attr('class', 'links');

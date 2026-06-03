@@ -295,7 +295,6 @@ export async function savePerson(data: Record<string, any>, editor: string): Pro
   const frontmatter = toFrontmatter({
     name:       data.name,
     branch:     data.branch,
-    generation: data.generation,
     born:       data.born       || null,
     deceased:   data.deceased   || null,
     died:       data.died       || null,
