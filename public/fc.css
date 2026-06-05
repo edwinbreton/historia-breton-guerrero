@@ -530,10 +530,24 @@
 
 .f3 .link {
   transition: stroke-width 0.2s ease-in-out;
+  stroke: rgba(42, 42, 36, 0.55) !important;
+  stroke-width: 2px !important;
 }
 
 .f3 .link.f3-path-to-main {
-  stroke-width: 4px;
+  stroke: rgba(42, 42, 36, 0.85) !important;
+  stroke-width: 3px !important;
+}
+
+/* Mini-tree indicator: make lines and boxes visible on light backgrounds */
+.f3 div.mini-tree line {
+  stroke: rgba(42, 42, 36, 0.6) !important;
+}
+.f3 div.mini-tree rect.card-male {
+  fill: #5A7270 !important;
+}
+.f3 div.mini-tree rect.card-female {
+  fill: #7A6E5A !important;
 }
 
 
