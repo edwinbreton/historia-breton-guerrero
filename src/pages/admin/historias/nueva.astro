@@ -28,12 +28,16 @@ if (Astro.request.method === 'POST') {
   if (!fields.date)   errors.push('La fecha es requerida.');
 
   if (errors.length === 0) {
-    const slug = await saveStory({
-      ...fields,
-      relatedPeople: fields.relatedPeople ? fields.relatedPeople.split(',').filter(Boolean) : [],
-    }, user?.username ?? 'unknown');
+    try {
+      const slug = await saveStory({
+        ...fields,
+        relatedPeople: fields.relatedPeople ? fields.relatedPeople.split(',').filter(Boolean) : [],
+      }, user?.username ?? 'unknown');
 
-    return Astro.redirect(`/admin/historias/${slug}/editar?saved=1`);
+      return Astro.redirect(`/admin/historias/${slug}/editar?saved=1`);
+    } catch (err) {
+      errors.push(`Error al guardar: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 }
 
