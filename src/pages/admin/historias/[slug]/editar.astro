@@ -69,7 +69,10 @@ const current = {
     </div>
 
     {justSaved && (
-      <div class="success-banner" role="status">✓ Cambios guardados correctamente.</div>
+      <div class="success-banner" role="status">
+        <p class="success-banner__title">✓ Cambios guardados correctamente.</p>
+        <p class="success-banner__note"><strong>Estos cambios aún no son visibles en el sitio.</strong> Están guardados y en espera de ser publicados. Cuando termines de hacer todos tus cambios, ve al panel de administración y usa el botón "Publicar cambios" para que aparezcan en el sitio.</p>
+      </div>
     )}
 
     {errors.length > 0 && (
@@ -162,6 +165,8 @@ const current = {
   .error-banner { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius); padding: var(--space-4); margin-bottom: var(--space-6); color: #b91c1c; font-size: 0.9375rem; }
   .error-banner p { margin: 0; }
   .success-banner { background: #f0fdf4; border: 1px solid #86efac; border-radius: var(--radius); padding: var(--space-4); margin-bottom: var(--space-6); color: #15803d; font-size: 0.9375rem; }
+  .success-banner__title { margin: 0 0 var(--space-2) 0; font-weight: 600; }
+  .success-banner__note  { margin: 0; font-size: 0.875rem; line-height: 1.5; }
 
   .form-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-6); margin-bottom: var(--space-6); }
   .form-section__title { font-size: 1rem; margin-bottom: var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }

@@ -90,7 +90,10 @@ const { Content } = await render(person);
     </div>
 
     {justSaved && (
-      <div class="success-banner" role="status">✓ Cambios guardados correctamente.</div>
+      <div class="success-banner" role="status">
+        <p class="success-banner__title">✓ Cambios guardados correctamente.</p>
+        <p class="success-banner__note"><strong>Estos cambios aún no son visibles en el sitio.</strong> Están guardados y en espera de ser publicados. Cuando termines de hacer todos tus cambios, ve al panel de administración y usa el botón "Publicar cambios" para que aparezcan en el sitio.</p>
+      </div>
     )}
 
     {errors.length > 0 && (
@@ -291,6 +294,8 @@ const { Content } = await render(person);
     color: #15803d;
     font-size: 0.9375rem;
   }
+  .success-banner__title { margin: 0 0 var(--space-2) 0; font-weight: 600; }
+  .success-banner__note  { margin: 0; font-size: 0.875rem; line-height: 1.5; }
 
   .form-section {
     background: var(--surface);

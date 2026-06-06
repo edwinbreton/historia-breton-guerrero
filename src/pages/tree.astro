@@ -60,7 +60,7 @@ const data = allPeople.map(p => {
   import * as f3 from 'family-chart';
 
   const cont = document.getElementById('FamilyChart') as HTMLElement;
-  if (!cont) throw new Error('FamilyChart container not found');
+  if (cont) {
 
   const data = JSON.parse(cont.dataset.people ?? '[]');
 
@@ -103,23 +103,27 @@ const data = allPeople.map(p => {
       const bg     = BRANCH_BG[branch]     ?? BRANCH_BG.both;
       const accent = BRANCH_ACCENT[branch] ?? BRANCH_ACCENT.breton;
 
+      const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
       return `
         <div class="card-inner card-image-rect" style="background:${bg};border-left:3px solid ${accent};">
           ${img
-            ? `<img src="${img}" alt="" loading="lazy">`
+            ? `<img src="${esc(img)}" alt="" loading="lazy">`
             : `<div class="card-no-photo"></div>`
           }
           <div class="card-label">
-            <div class="card-name1">${name1}</div>
-            ${name2 ? `<div class="card-name2">${name2}</div>` : ''}
-            ${year  ? `<div class="card-year">${year}</div>`  : ''}
-            <a href="/people/${id}" class="card-profile-link" onclick="event.stopPropagation()">Ver perfil →</a>
+            <div class="card-name1">${esc(name1)}</div>
+            ${name2 ? `<div class="card-name2">${esc(name2)}</div>` : ''}
+            ${year  ? `<div class="card-year">${esc(year)}</div>`   : ''}
+            <a href="/people/${esc(id)}" class="card-profile-link" onclick="event.stopPropagation()">Ver perfil →</a>
           </div>
         </div>
       `;
     });
 
   f3Chart.updateTree({ initial: true });
+
+  }
 </script>
 
 <style>

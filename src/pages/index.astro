@@ -2,23 +2,67 @@
 import Layout from '../layouts/Layout.astro';
 import { getCollection } from 'astro:content';
 
-// These will be populated once content exists
-// For now we show the structure with empty/placeholder states
-let people: any[] = [];
-let stories: any[] = [];
+const allPeople  = await getCollection('people');
+const allStories = await getCollection('stories');
 
-try {
-  // TinaCMS stores content in content/people and content/stories
-  // Astro content collections aren't wired yet — data comes via TinaCMS client
-  // We import statically for now; swap with TinaCMS query once Cloud is set up
-} catch {}
+// Stats
+const photoCount = allPeople.reduce((sum, p) =>
+  sum + (p.data.portrait ? 1 : 0) + (p.data.photos?.length ?? 0), 0);
 
 const stats = [
-  { label: 'Personas', value: people.length || '—' },
-  { label: 'Historias', value: stories.length || '—' },
-  { label: 'Generaciones', value: '—' },
-  { label: 'Fotos', value: '—' },
+  { label: 'Personas',  value: allPeople.length  || '—' },
+  { label: 'Historias', value: allStories.length || '—' },
+  { label: 'Fotos',     value: photoCount         || '—' },
 ];
+
+type Person = (typeof allPeople)[0];
+
+// Branch columns — oldest generation first, up to 4 per branch
+function byBirthYear(a: Person, b: Person) {
+  const ay = a.data.born ? parseInt(a.data.born) : 9999;
+  const by = b.data.born ? parseInt(b.data.born) : 9999;
+  return ay - by;
+}
+const bretonPeople   = allPeople.filter(p => p.data.branch === 'breton'   || p.data.branch === 'both').sort(byBirthYear).slice(0, 4);
+const guerreroPeople = allPeople.filter(p => p.data.branch === 'guerrero' || p.data.branch === 'both').sort(byBirthYear).slice(0, 4);
+
+// Meeting couples — find Bretón people married to Guerrero people
+const byId = new Map(allPeople.map(p => [p.id, p]));
+const meetingCouples: Array<{ breton: Person; guerrero: Person }> = [];
+for (const p of allPeople) {
+  if (meetingCouples.length >= 2) break;
+  if (p.data.branch !== 'breton') continue;
+  for (const sid of (p.data.spouses ?? [])) {
+    const spouse = byId.get(sid);
+    if (spouse?.data.branch === 'guerrero') {
+      meetingCouples.push({ breton: p, guerrero: spouse });
+      break;
+    }
+  }
+}
+
+// Recently added — most recent stories first, then fill with people
+const sortedStories = [...allStories].sort((a, b) => b.data.date.localeCompare(a.data.date));
+const recentItems: Array<{ type: 'story' | 'person'; id: string; title: string; subtitle: string; href: string; branch: string; portrait?: string }> = [
+  ...sortedStories.slice(0, 3).map(s => ({
+    type: 'story' as const,
+    id: s.id,
+    title: s.data.title,
+    subtitle: s.data.date,
+    href: `/stories/${s.id}`,
+    branch: s.data.branch,
+    portrait: s.data.featuredImage,
+  })),
+  ...allPeople.slice(-3).reverse().map(p => ({
+    type: 'person' as const,
+    id: p.id,
+    title: p.data.name,
+    subtitle: p.data.born ? p.data.born.slice(0, 4) : '',
+    href: `/people/${p.id}`,
+    branch: p.data.branch,
+    portrait: p.data.portrait,
+  })),
+].slice(0, 6);
 ---
 
 <Layout title="Inicio">
@@ -59,9 +103,19 @@ const stats = [
           <a href="/people?branch=breton" class="branch-col__link">Ver todos →</a>
         </div>
         <div class="branch-col__cards">
-          <div class="branch-empty">
-            <p>Próximamente.</p>
-          </div>
+          {bretonPeople.length > 0 ? bretonPeople.map(p => (
+            <a href={`/people/${p.id}`} class="home-person-card">
+              <div class="home-person-card__avatar home-person-card__avatar--breton">
+                {p.data.portrait && <img src={p.data.portrait} alt={p.data.name} />}
+              </div>
+              <div class="home-person-card__info">
+                <span class="home-person-card__name">{p.data.name}</span>
+                {p.data.born && <span class="home-person-card__year">{p.data.born.slice(0,4)}</span>}
+              </div>
+            </a>
+          )) : (
+            <div class="branch-empty"><p>Próximamente.</p></div>
+          )}
         </div>
       </div>
 
@@ -74,9 +128,19 @@ const stats = [
           <a href="/people?branch=guerrero" class="branch-col__link">Ver todos →</a>
         </div>
         <div class="branch-col__cards">
-          <div class="branch-empty">
-            <p>Próximamente.</p>
-          </div>
+          {guerreroPeople.length > 0 ? guerreroPeople.map(p => (
+            <a href={`/people/${p.id}`} class="home-person-card">
+              <div class="home-person-card__avatar home-person-card__avatar--guerrero">
+                {p.data.portrait && <img src={p.data.portrait} alt={p.data.name} />}
+              </div>
+              <div class="home-person-card__info">
+                <span class="home-person-card__name">{p.data.name}</span>
+                {p.data.born && <span class="home-person-card__year">{p.data.born.slice(0,4)}</span>}
+              </div>
+            </a>
+          )) : (
+            <div class="branch-empty"><p>Próximamente.</p></div>
+          )}
         </div>
       </div>
     </div>
@@ -91,35 +155,73 @@ const stats = [
         uniendo a las familias dos veces.
       </p>
       <div class="meeting__couples">
-        <div class="meeting__couple">
-          <div class="meeting__person">
-            <div class="meeting__avatar meeting__avatar--breton"></div>
-            <p class="meeting__name">—</p>
-            <p class="meeting__family branch-breton">Bretón</p>
-          </div>
-          <div class="meeting__heart" aria-hidden="true">♥</div>
-          <div class="meeting__person">
-            <div class="meeting__avatar meeting__avatar--guerrero"></div>
-            <p class="meeting__name">—</p>
-            <p class="meeting__family branch-guerrero">Guerrero</p>
-          </div>
-        </div>
-
-        <div class="meeting__and" aria-hidden="true">y</div>
-
-        <div class="meeting__couple">
-          <div class="meeting__person">
-            <div class="meeting__avatar meeting__avatar--breton"></div>
-            <p class="meeting__name">—</p>
-            <p class="meeting__family branch-breton">Bretón</p>
-          </div>
-          <div class="meeting__heart" aria-hidden="true">♥</div>
-          <div class="meeting__person">
-            <div class="meeting__avatar meeting__avatar--guerrero"></div>
-            <p class="meeting__name">—</p>
-            <p class="meeting__family branch-guerrero">Guerrero</p>
-          </div>
-        </div>
+        {meetingCouples.length > 0 ? meetingCouples.map((couple, i) => (
+          <>
+            {i > 0 && <div class="meeting__and" aria-hidden="true">y</div>}
+            <div class="meeting__couple">
+              <a href={`/people/${couple.breton.id}`} class="meeting__person">
+                <div class="meeting__avatar meeting__avatar--breton">
+                  {couple.breton.data.portrait && <img src={couple.breton.data.portrait} alt={couple.breton.data.name} />}
+                </div>
+                <p class="meeting__name">{couple.breton.data.name}</p>
+                <p class="meeting__family branch-breton">Bretón</p>
+              </a>
+              <div class="meeting__heart" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="9" />
+                  <circle cx="12" cy="12" r="5" />
+                </svg>
+              </div>
+              <a href={`/people/${couple.guerrero.id}`} class="meeting__person">
+                <div class="meeting__avatar meeting__avatar--guerrero">
+                  {couple.guerrero.data.portrait && <img src={couple.guerrero.data.portrait} alt={couple.guerrero.data.name} />}
+                </div>
+                <p class="meeting__name">{couple.guerrero.data.name}</p>
+                <p class="meeting__family branch-guerrero">Guerrero</p>
+              </a>
+            </div>
+          </>
+        )) : (
+          <>
+            <div class="meeting__couple">
+              <div class="meeting__person">
+                <div class="meeting__avatar meeting__avatar--breton"></div>
+                <p class="meeting__name">—</p>
+                <p class="meeting__family branch-breton">Bretón</p>
+              </div>
+              <div class="meeting__heart" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="9" />
+                  <circle cx="12" cy="12" r="5" />
+                </svg>
+              </div>
+              <div class="meeting__person">
+                <div class="meeting__avatar meeting__avatar--guerrero"></div>
+                <p class="meeting__name">—</p>
+                <p class="meeting__family branch-guerrero">Guerrero</p>
+              </div>
+            </div>
+            <div class="meeting__and" aria-hidden="true">y</div>
+            <div class="meeting__couple">
+              <div class="meeting__person">
+                <div class="meeting__avatar meeting__avatar--breton"></div>
+                <p class="meeting__name">—</p>
+                <p class="meeting__family branch-breton">Bretón</p>
+              </div>
+              <div class="meeting__heart" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="9" />
+                  <circle cx="12" cy="12" r="5" />
+                </svg>
+              </div>
+              <div class="meeting__person">
+                <div class="meeting__avatar meeting__avatar--guerrero"></div>
+                <p class="meeting__name">—</p>
+                <p class="meeting__family branch-guerrero">Guerrero</p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   </section>
@@ -128,9 +230,29 @@ const stats = [
   <section class="recent" aria-labelledby="recent-title">
     <div class="container">
       <h2 id="recent-title" class="recent__title">Agregado recientemente</h2>
-      <div class="recent__empty">
-        <p>El contenido aparecerá aquí próximamente.</p>
-      </div>
+      {recentItems.length > 0 ? (
+        <div class="recent__grid">
+          {recentItems.map(item => (
+            <a href={item.href} class={`recent-card recent-card--${item.branch}`}>
+              <div class={`recent-card__thumb recent-card__thumb--${item.branch}`}>
+                {item.portrait && <img src={item.portrait} alt={item.title} />}
+                {item.type === 'story' && !item.portrait && <span class="recent-card__type-icon">📖</span>}
+              </div>
+              <div class="recent-card__body">
+                <span class={`recent-card__type branch-${item.branch}`}>
+                  {item.type === 'story' ? 'Historia' : 'Persona'}
+                </span>
+                <p class="recent-card__title">{item.title}</p>
+                {item.subtitle && <p class="recent-card__sub">{item.subtitle}</p>}
+              </div>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <div class="recent__empty">
+          <p>El contenido aparecerá aquí próximamente.</p>
+        </div>
+      )}
     </div>
   </section>
 </Layout>
@@ -347,8 +469,10 @@ const stats = [
   }
 
   .meeting__heart {
-    font-size: 1.5rem;
-    color: var(--shared);
+    color: var(--text-muted);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
   }
 
   /* Recent section */
@@ -371,6 +495,141 @@ const stats = [
     flex-direction: column;
     align-items: center;
     gap: var(--space-6);
+  }
+
+  /* Home person cards (branch columns) */
+  .branch-col__cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .home-person-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .home-person-card:hover {
+    border-color: var(--breton);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .branch-col--guerrero .home-person-card:hover {
+    border-color: var(--guerrero);
+  }
+
+  .home-person-card__avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    overflow: hidden;
+    border: 2px solid;
+  }
+  .home-person-card__avatar--breton   { border-color: var(--breton);   background: var(--breton-light); }
+  .home-person-card__avatar--guerrero { border-color: var(--guerrero); background: var(--guerrero-light); }
+  .home-person-card__avatar img {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+
+  .home-person-card__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .home-person-card__name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .home-person-card__year {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  /* Meeting section — clickable person cards */
+  .meeting__person {
+    text-decoration: none;
+    color: inherit;
+  }
+  .meeting__avatar {
+    overflow: hidden;
+  }
+  .meeting__avatar img {
+    width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+  }
+
+  /* Recently added grid */
+  .recent__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .recent-card {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--text-primary);
+    background: var(--surface);
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .recent-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  }
+  .recent-card--breton:hover   { border-color: var(--breton); }
+  .recent-card--guerrero:hover { border-color: var(--guerrero); }
+  .recent-card--both:hover     { border-color: var(--breton); }
+
+  .recent-card__thumb {
+    width: 100%;
+    aspect-ratio: 4/3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+  }
+  .recent-card__thumb--breton   { background: var(--breton-light); }
+  .recent-card__thumb--guerrero { background: var(--guerrero-light); }
+  .recent-card__thumb--both     { background: linear-gradient(135deg, var(--breton-light) 50%, var(--guerrero-light) 50%); }
+  .recent-card__thumb img {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+
+  .recent-card__body {
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .recent-card__type {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    font-weight: 600;
+  }
+  .recent-card__title {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .recent-card__sub {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
   }
 
   /* Responsive */
